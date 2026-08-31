@@ -197,8 +197,7 @@ public class MainActivityTest {
     }
 
     private static void injectGraphPan(WebView webView) throws Exception {
-        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
-        GraphScreenRect graph = graphScreenRect(webView);
+        GraphScreenRect graph = graphViewRect(webView);
 
         float startX = graph.left + graph.width * 0.68f;
         float endX = graph.left + graph.width * 0.32f;
@@ -206,8 +205,8 @@ public class MainActivityTest {
         long downTime = SystemClock.uptimeMillis();
         MotionEvent.PointerProperties pointer = pointerProperties(0);
 
-        inject(
-            instrumentation,
+        dispatchToWebView(
+            webView,
             event(
                 downTime,
                 downTime,
@@ -220,8 +219,8 @@ public class MainActivityTest {
         for (int step = 1; step <= 10; step++) {
             float t = step / 10f;
             float x = startX + (endX - startX) * t;
-            inject(
-                instrumentation,
+            dispatchToWebView(
+                webView,
                 event(
                     downTime,
                     SystemClock.uptimeMillis(),
@@ -233,8 +232,8 @@ public class MainActivityTest {
             SystemClock.sleep(20L);
         }
 
-        inject(
-            instrumentation,
+        dispatchToWebView(
+            webView,
             event(
                 downTime,
                 SystemClock.uptimeMillis(),
@@ -246,8 +245,7 @@ public class MainActivityTest {
     }
 
     private static void injectPinchOpen(WebView webView) throws Exception {
-        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
-        GraphScreenRect graph = graphScreenRect(webView);
+        GraphScreenRect graph = graphViewRect(webView);
 
         float centerX = graph.left + graph.width / 2f;
         float centerY = graph.top + graph.height / 2f;
@@ -259,8 +257,8 @@ public class MainActivityTest {
         MotionEvent.PointerProperties p0 = pointerProperties(0);
         MotionEvent.PointerProperties p1 = pointerProperties(1);
 
-        inject(
-            instrumentation,
+        dispatchToWebView(
+            webView,
             event(
                 downTime,
                 downTime,
@@ -270,8 +268,8 @@ public class MainActivityTest {
             )
         );
 
-        inject(
-            instrumentation,
+        dispatchToWebView(
+            webView,
             event(
                 downTime,
                 SystemClock.uptimeMillis(),
@@ -287,8 +285,8 @@ public class MainActivityTest {
         for (int step = 1; step <= 10; step++) {
             float t = step / 10f;
             float halfSpan = startHalfSpan + (endHalfSpan - startHalfSpan) * t;
-            inject(
-                instrumentation,
+            dispatchToWebView(
+                webView,
                 event(
                     downTime,
                     SystemClock.uptimeMillis(),
@@ -303,8 +301,8 @@ public class MainActivityTest {
             SystemClock.sleep(22L);
         }
 
-        inject(
-            instrumentation,
+        dispatchToWebView(
+            webView,
             event(
                 downTime,
                 SystemClock.uptimeMillis(),
@@ -317,8 +315,8 @@ public class MainActivityTest {
             )
         );
 
-        inject(
-            instrumentation,
+        dispatchToWebView(
+            webView,
             event(
                 downTime,
                 SystemClock.uptimeMillis(),
@@ -329,7 +327,7 @@ public class MainActivityTest {
         );
     }
 
-    private static GraphScreenRect graphScreenRect(WebView webView) throws Exception {
+    private static GraphScreenRect graphViewRect(WebView webView) throws Exception {
         int cssLeft = evalJsInt(
             webView,
             "document.querySelector('[data-testid=graph-host]').getBoundingClientRect().left"
@@ -349,11 +347,9 @@ public class MainActivityTest {
         int innerWidth = evalJsInt(webView, "window.innerWidth");
         int innerHeight = evalJsInt(webView, "window.innerHeight");
 
-        int[] location = new int[2];
         int[] dimensions = new int[2];
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
-            webView.getLocationOnScreen(location);
             dimensions[0] = webView.getWidth();
             dimensions[1] = webView.getHeight();
         });
@@ -361,9 +357,10 @@ public class MainActivityTest {
         float scaleX = dimensions[0] / (float) Math.max(1, innerWidth);
         float scaleY = dimensions[1] / (float) Math.max(1, innerHeight);
 
+        // dispatchTouchEvent() consumes coordinates local to the WebView.
         return new GraphScreenRect(
-            location[0] + cssLeft * scaleX,
-            location[1] + cssTop * scaleY,
+            cssLeft * scaleX,
+            cssTop * scaleY,
             cssWidth * scaleX,
             cssHeight * scaleY
         );
@@ -410,11 +407,15 @@ public class MainActivityTest {
         );
     }
 
-    private static void inject(Instrumentation instrumentation, MotionEvent event) {
+    private static void dispatchToWebView(WebView webView, MotionEvent event) {
+        AtomicReference<Boolean> handled = new AtomicReference<>(false);
         try {
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(() ->
+                handled.set(webView.dispatchTouchEvent(event))
+            );
             assertTrue(
-                "UiAutomation must inject touchscreen event",
-                instrumentation.getUiAutomation().injectInputEvent(event, true)
+                "Capacitor WebView must handle native touchscreen MotionEvent",
+                handled.get()
             );
         } finally {
             event.recycle();
