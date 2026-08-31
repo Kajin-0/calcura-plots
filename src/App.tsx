@@ -1,5 +1,8 @@
-import { useState } from 'react'
-import FunctionGraph, { type PlotViewport } from './FunctionGraph'
+import { useMemo, useState } from 'react'
+import FunctionGraph, {
+  type GraphFunctionDefinition,
+  type PlotViewport,
+} from './FunctionGraph'
 import { PLOT_PRESETS } from './testFunctions'
 
 const DEFAULT_PRESET = PLOT_PRESETS[0]
@@ -10,6 +13,16 @@ function viewportFromPreset(): PlotViewport {
   return {
     x: [...DEFAULT_PRESET.xDomain],
     y: [...DEFAULT_PRESET.yDomain],
+  }
+}
+
+function cloneDefinition(
+  definition: GraphFunctionDefinition,
+): GraphFunctionDefinition {
+  return {
+    ...definition,
+    domain: definition.domain ? [...definition.domain] : undefined,
+    exclusions: definition.exclusions?.map((exclusion) => ({ ...exclusion })),
   }
 }
 
@@ -38,8 +51,12 @@ function NumberField({
 
 export default function App() {
   const [selectedPresetId, setSelectedPresetId] = useState(DEFAULT_PRESET.id)
-  const [expression, setExpression] = useState(DEFAULT_PRESET.expression)
+  const [definition, setDefinition] = useState<GraphFunctionDefinition>(() =>
+    cloneDefinition(DEFAULT_PRESET.functionDefinition),
+  )
   const [viewport, setViewport] = useState<PlotViewport>(viewportFromPreset)
+
+  const functions = useMemo(() => [definition], [definition])
 
   const applyPreset = (presetId: string) => {
     const preset = PLOT_PRESETS.find((candidate) => candidate.id === presetId)
@@ -48,7 +65,7 @@ export default function App() {
     }
 
     setSelectedPresetId(preset.id)
-    setExpression(preset.expression)
+    setDefinition(cloneDefinition(preset.functionDefinition))
     setViewport({
       x: [...preset.xDomain],
       y: [...preset.yDomain],
@@ -77,11 +94,11 @@ export default function App() {
           <p className="eyebrow">Standalone integration lab</p>
           <h1>Calcura Plots</h1>
           <p className="subtitle">
-            Phase 2: characterize function-plot correctness and interaction behavior before
-            any Calcura integration.
+            Phase 3: Calcura-owned expression and domain semantics with function-plot isolated
+            as the rendering backend.
           </p>
         </div>
-        <span className="phase-badge">Phase 2</span>
+        <span className="phase-badge">Phase 3</span>
       </header>
 
       <section className="control-panel" aria-label="Plot controls">
@@ -105,9 +122,14 @@ export default function App() {
           <input
             type="text"
             spellCheck={false}
-            value={expression}
+            value={definition.expression}
             onChange={(event) => {
-              setExpression(event.target.value)
+              setDefinition((current) => ({
+                ...current,
+                expression: event.target.value,
+                domain: undefined,
+                exclusions: undefined,
+              }))
               setSelectedPresetId('')
             }}
             aria-label="Function expression"
@@ -142,17 +164,18 @@ export default function App() {
         <div className="plot-heading">
           <div>
             <span className="plot-label">Current expression</span>
-            <code>{expression || '—'}</code>
+            <code>{definition.expression || '—'}</code>
           </div>
           <span className="interaction-note">Drag to pan · scroll/pinch to zoom</span>
         </div>
 
-        <FunctionGraph expression={expression} viewport={viewport} />
+        <FunctionGraph functions={functions} viewport={viewport} />
       </section>
 
       <footer className="lab-note">
-        Phase 2 intentionally tests function-plot as a package. Calcura LaTeX parsing,
-        evaluator ownership, and a permanent graph contract remain out of scope.
+        Expressions are now parsed and validated by the graph adapter using the same
+        mathjs version as Calcura. function-plot receives numeric callbacks and no longer
+        owns expression semantics.
       </footer>
     </main>
   )

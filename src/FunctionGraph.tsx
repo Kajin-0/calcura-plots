@@ -1,13 +1,33 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react'
-import functionPlot, { type FunctionPlotOptions } from 'function-plot'
+import {
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+import functionPlot, {
+  type Chart,
+  type FunctionPlotOptions,
+} from 'function-plot'
+import {
+  compileGraphFunctions,
+  GraphExpressionError,
+} from './graph/expressionAdapter'
+import { renderSemanticOverlays } from './graph/semanticOverlay'
+import type {
+  CompiledGraphFunction,
+  GraphFunctionDefinition,
+  PlotViewport,
+} from './graph/types'
 
-export interface PlotViewport {
-  x: [number, number]
-  y: [number, number]
-}
+export type {
+  GraphExclusion,
+  GraphFunctionDefinition,
+  PlotViewport,
+} from './graph/types'
 
 interface FunctionGraphProps {
-  expression: string
+  functions: GraphFunctionDefinition[]
   viewport: PlotViewport
   height?: number
 }
@@ -20,18 +40,51 @@ function getErrorMessage(error: unknown): string {
   return String(error)
 }
 
+function viewportKey(viewport: PlotViewport): string {
+  return [...viewport.x, ...viewport.y].join('|')
+}
+
 export default function FunctionGraph({
-  expression,
+  functions,
   viewport,
   height = 420,
 }: FunctionGraphProps) {
   const hostRef = useRef<HTMLDivElement>(null)
   const optionsRef = useRef<FunctionPlotOptions | null>(null)
+  const chartRef = useRef<Chart | null>(null)
+  const overlayListenerRef = useRef<(() => void) | null>(null)
+  const compiledFunctionsRef = useRef<CompiledGraphFunction[]>([])
+  const previousViewportKeyRef = useRef<string | null>(null)
   const [renderError, setRenderError] = useState<string | null>(null)
+
+  const compilation = useMemo(() => {
+    try {
+      return {
+        compiled: compileGraphFunctions(functions),
+        error: null,
+      }
+    } catch (error) {
+      return {
+        compiled: [] as CompiledGraphFunction[],
+        error:
+          error instanceof GraphExpressionError
+            ? error.message
+            : getErrorMessage(error),
+      }
+    }
+  }, [functions])
+
+  compiledFunctionsRef.current = compilation.compiled
 
   const draw = useCallback(() => {
     const host = hostRef.current
     if (!host) {
+      return
+    }
+
+    if (compilation.error) {
+      host.replaceChildren()
+      setRenderError(compilation.error)
       return
     }
 
@@ -45,6 +98,8 @@ export default function FunctionGraph({
     }
 
     const width = Math.max(320, Math.floor(host.getBoundingClientRect().width))
+    const nextViewportKey = viewportKey(viewport)
+    const viewportChanged = previousViewportKeyRef.current !== nextViewportKey
 
     const options: FunctionPlotOptions =
       optionsRef.current ??
@@ -61,35 +116,59 @@ export default function FunctionGraph({
       xLine: true,
       yLine: true,
     }
-    options.xAxis = {
-      domain: [xMin, xMax],
-      label: 'x',
-      position: 'sticky',
+
+    if (!optionsRef.current || viewportChanged) {
+      options.xAxis = {
+        domain: [xMin, xMax],
+        label: 'x',
+        position: 'sticky',
+      }
+      options.yAxis = {
+        domain: [yMin, yMax],
+        label: 'y',
+        position: 'sticky',
+      }
+      previousViewportKeyRef.current = nextViewportKey
     }
-    options.yAxis = {
-      domain: [yMin, yMax],
-      label: 'y',
-      position: 'sticky',
-    }
-    options.data = [
-      {
-        fn: expression,
-        fnType: 'linear',
-        graphType: 'polyline',
-        sampler: 'builtIn',
-      },
-    ]
+
+    options.data = compilation.compiled.map((compiled) => ({
+      fn: ({ x }: { x: number }) => compiled.evaluate(Number(x)),
+      fnType: 'linear',
+      graphType: 'polyline',
+      sampler: 'builtIn',
+      range: compiled.definition.domain,
+      color: compiled.definition.color,
+    }))
 
     optionsRef.current = options
 
     try {
-      functionPlot(options)
+      const chart = functionPlot(options)
+
+      if (chartRef.current !== chart) {
+        if (chartRef.current && overlayListenerRef.current) {
+          chartRef.current.removeListener('after:draw', overlayListenerRef.current)
+        }
+
+        const listener = () => {
+          const currentHost = hostRef.current
+          if (currentHost) {
+            renderSemanticOverlays(currentHost, chart, compiledFunctionsRef.current)
+          }
+        }
+
+        chart.on('after:draw', listener)
+        chartRef.current = chart
+        overlayListenerRef.current = listener
+      }
+
+      renderSemanticOverlays(host, chart, compilation.compiled)
       setRenderError(null)
     } catch (error) {
       host.replaceChildren()
       setRenderError(getErrorMessage(error))
     }
-  }, [expression, height, viewport])
+  }, [compilation, height, viewport])
 
   useLayoutEffect(() => {
     const host = hostRef.current
@@ -110,6 +189,18 @@ export default function FunctionGraph({
     }
   }, [draw])
 
+  useLayoutEffect(() => {
+    return () => {
+      if (chartRef.current && overlayListenerRef.current) {
+        chartRef.current.removeListener('after:draw', overlayListenerRef.current)
+      }
+    }
+  }, [])
+
+  const accessibleExpression = functions
+    .map((definition) => definition.expression)
+    .join(', ')
+
   return (
     <div className="graph-shell">
       <div
@@ -117,7 +208,7 @@ export default function FunctionGraph({
         className="graph-host"
         data-testid="graph-host"
         role="img"
-        aria-label={'Graph of ' + expression}
+        aria-label={'Graph of ' + accessibleExpression}
       />
       {renderError ? (
         <div className="graph-error" role="alert">

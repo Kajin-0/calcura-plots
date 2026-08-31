@@ -20,6 +20,9 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Unit adapter audit
+        run: npm run test:unit
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -29,7 +32,7 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Phase 2 browser audit
+      - name: Browser capability audit
         run: npm run test:e2e
 
       - name: Upload Playwright report on failure
