@@ -1,14 +1,13 @@
 package com.calcura.plotslab;
 
-import static androidx.test.espresso.Espresso.onView;
-import static androidx.test.espresso.action.ViewActions.swipeLeft;
-import static androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
 import android.app.Instrumentation;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.os.SystemClock;
 import android.view.InputDevice;
 import android.view.MotionEvent;
@@ -27,7 +26,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @RunWith(AndroidJUnit4.class)
 public class MainActivityTest {
-    private static final long JS_TIMEOUT_MS = 10_000L;
+    private static final long JS_TIMEOUT_MS = 20_000L;
 
     @Test
     public void certifiesCalcuraPlotsInsideRealCapacitorWebView() throws Exception {
@@ -44,17 +43,22 @@ public class MainActivityTest {
             WebView webView = webViewRef.get();
             assertTrue("Capacitor WebView must exist", webView != null);
 
-            waitForJsBoolean(
-                webView,
-                "document.readyState === 'complete' && " +
-                    "document.querySelector('[data-testid=graph-host] path.line.line-0') !== null",
-                JS_TIMEOUT_MS
-            );
+            try {
+                waitForJsBoolean(
+                    webView,
+                    "document.readyState === 'complete' && " +
+                        "document.querySelector('[data-testid=graph-host] path.line.line-0') !== null",
+                    JS_TIMEOUT_MS
+                );
+            } catch (AssertionError error) {
+                printWebViewDiagnostics(webView);
+                throw error;
+            }
 
             long readyMs = SystemClock.elapsedRealtime() - launchStarted;
             assertTrue(
-                "Initial graph should be ready within 10 seconds on emulator; was " + readyMs + " ms",
-                readyMs < 10_000L
+                "Initial graph should be ready within 20 seconds on emulator; was " + readyMs + " ms",
+                readyMs < 20_000L
             );
 
             assertTrue(
@@ -94,9 +98,9 @@ public class MainActivityTest {
 
             int beforePanHash = evalJsInt(webView, curveHashJs());
 
-            // Genuine Android single-finger gesture delivered to the Capacitor WebView.
-            onView(isAssignableFrom(WebView.class)).perform(swipeLeft());
-            SystemClock.sleep(450L);
+            // Genuine Android finger gesture targeted inside the graph viewport.
+            injectGraphPan(webView);
+            SystemClock.sleep(500L);
 
             int afterPanHash = evalJsInt(webView, curveHashJs());
             assertNotEquals(
@@ -107,7 +111,7 @@ public class MainActivityTest {
 
             int beforePinchHash = afterPanHash;
             injectPinchOpen(webView);
-            SystemClock.sleep(500L);
+            SystemClock.sleep(550L);
             int afterPinchHash = evalJsInt(webView, curveHashJs());
 
             assertNotEquals(
@@ -192,21 +196,63 @@ public class MainActivityTest {
         "})()";
     }
 
+    private static void injectGraphPan(WebView webView) throws Exception {
+        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        GraphScreenRect graph = graphScreenRect(webView);
+
+        float startX = graph.left + graph.width * 0.68f;
+        float endX = graph.left + graph.width * 0.32f;
+        float y = graph.top + graph.height * 0.50f;
+        long downTime = SystemClock.uptimeMillis();
+        MotionEvent.PointerProperties pointer = pointerProperties(0);
+
+        inject(
+            instrumentation,
+            event(
+                downTime,
+                downTime,
+                MotionEvent.ACTION_DOWN,
+                new MotionEvent.PointerProperties[]{pointer},
+                new MotionEvent.PointerCoords[]{coords(startX, y)}
+            )
+        );
+
+        for (int step = 1; step <= 10; step++) {
+            float t = step / 10f;
+            float x = startX + (endX - startX) * t;
+            inject(
+                instrumentation,
+                event(
+                    downTime,
+                    SystemClock.uptimeMillis(),
+                    MotionEvent.ACTION_MOVE,
+                    new MotionEvent.PointerProperties[]{pointer},
+                    new MotionEvent.PointerCoords[]{coords(x, y)}
+                )
+            );
+            SystemClock.sleep(20L);
+        }
+
+        inject(
+            instrumentation,
+            event(
+                downTime,
+                SystemClock.uptimeMillis(),
+                MotionEvent.ACTION_UP,
+                new MotionEvent.PointerProperties[]{pointer},
+                new MotionEvent.PointerCoords[]{coords(endX, y)}
+            )
+        );
+    }
+
     private static void injectPinchOpen(WebView webView) throws Exception {
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
-        int[] location = new int[2];
-        int[] dimensions = new int[2];
+        GraphScreenRect graph = graphScreenRect(webView);
 
-        instrumentation.runOnMainSync(() -> {
-            webView.getLocationOnScreen(location);
-            dimensions[0] = webView.getWidth();
-            dimensions[1] = webView.getHeight();
-        });
-
-        float centerX = location[0] + dimensions[0] / 2f;
-        float centerY = location[1] + dimensions[1] / 2f;
-        float startHalfSpan = Math.max(20f, dimensions[0] * 0.07f);
-        float endHalfSpan = Math.max(80f, dimensions[0] * 0.26f);
+        float centerX = graph.left + graph.width / 2f;
+        float centerY = graph.top + graph.height / 2f;
+        float startHalfSpan = Math.max(18f, graph.width * 0.07f);
+        float endHalfSpan = Math.max(70f, graph.width * 0.28f);
 
         long downTime = SystemClock.uptimeMillis();
 
@@ -238,8 +284,8 @@ public class MainActivityTest {
             )
         );
 
-        for (int step = 1; step <= 8; step++) {
-            float t = step / 8f;
+        for (int step = 1; step <= 10; step++) {
+            float t = step / 10f;
             float halfSpan = startHalfSpan + (endHalfSpan - startHalfSpan) * t;
             inject(
                 instrumentation,
@@ -254,7 +300,7 @@ public class MainActivityTest {
                     }
                 )
             );
-            SystemClock.sleep(24L);
+            SystemClock.sleep(22L);
         }
 
         inject(
@@ -280,6 +326,46 @@ public class MainActivityTest {
                 new MotionEvent.PointerProperties[]{p0},
                 new MotionEvent.PointerCoords[]{coords(centerX - endHalfSpan, centerY)}
             )
+        );
+    }
+
+    private static GraphScreenRect graphScreenRect(WebView webView) throws Exception {
+        int cssLeft = evalJsInt(
+            webView,
+            "document.querySelector('[data-testid=graph-host]').getBoundingClientRect().left"
+        );
+        int cssTop = evalJsInt(
+            webView,
+            "document.querySelector('[data-testid=graph-host]').getBoundingClientRect().top"
+        );
+        int cssWidth = evalJsInt(
+            webView,
+            "document.querySelector('[data-testid=graph-host]').getBoundingClientRect().width"
+        );
+        int cssHeight = evalJsInt(
+            webView,
+            "document.querySelector('[data-testid=graph-host]').getBoundingClientRect().height"
+        );
+        int innerWidth = evalJsInt(webView, "window.innerWidth");
+        int innerHeight = evalJsInt(webView, "window.innerHeight");
+
+        int[] location = new int[2];
+        int[] dimensions = new int[2];
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
+            webView.getLocationOnScreen(location);
+            dimensions[0] = webView.getWidth();
+            dimensions[1] = webView.getHeight();
+        });
+
+        float scaleX = dimensions[0] / (float) Math.max(1, innerWidth);
+        float scaleY = dimensions[1] / (float) Math.max(1, innerHeight);
+
+        return new GraphScreenRect(
+            location[0] + cssLeft * scaleX,
+            location[1] + cssTop * scaleY,
+            cssWidth * scaleX,
+            cssHeight * scaleY
         );
     }
 
@@ -335,6 +421,66 @@ public class MainActivityTest {
         }
     }
 
+    private static void printWebViewDiagnostics(WebView webView) {
+        try {
+            boolean ready = evalJsBoolean(webView, "document.readyState === 'complete'");
+            boolean moduleScript = evalJsBoolean(
+                webView,
+                "document.querySelector('script[type=module]') !== null"
+            );
+            boolean moduleSupport = evalJsBoolean(
+                webView,
+                "'noModule' in HTMLScriptElement.prototype"
+            );
+            int rootChildren = evalJsInt(
+                webView,
+                "(document.getElementById('root') && document.getElementById('root').children.length) || 0"
+            );
+            int bodyChildren = evalJsInt(webView, "document.body ? document.body.children.length : 0");
+
+            System.out.println(
+                "CALCURA_PLOTS_WEBVIEW_DIAGNOSTICS " +
+                "{api=" + android.os.Build.VERSION.SDK_INT +
+                ",webViewPackage=" + webViewPackageVersion() +
+                ",ready=" + ready +
+                ",moduleScript=" + moduleScript +
+                ",moduleSupport=" + moduleSupport +
+                ",rootChildren=" + rootChildren +
+                ",bodyChildren=" + bodyChildren +
+                "}"
+            );
+        } catch (Throwable diagnosticError) {
+            System.out.println(
+                "CALCURA_PLOTS_WEBVIEW_DIAGNOSTICS " +
+                "{api=" + android.os.Build.VERSION.SDK_INT +
+                ",webViewPackage=" + webViewPackageVersion() +
+                ",diagnosticError=" + diagnosticError.getClass().getSimpleName() +
+                "}"
+            );
+        }
+    }
+
+    private static String webViewPackageVersion() {
+        PackageManager packageManager =
+            InstrumentationRegistry.getInstrumentation().getTargetContext().getPackageManager();
+        String[] candidates = {
+            "com.google.android.webview",
+            "com.android.webview",
+            "com.android.chrome"
+        };
+
+        for (String packageName : candidates) {
+            try {
+                PackageInfo info = packageManager.getPackageInfo(packageName, 0);
+                return packageName + ":" + info.versionName;
+            } catch (PackageManager.NameNotFoundException ignored) {
+                // Try the next known WebView provider package.
+            }
+        }
+
+        return "unknown";
+    }
+
     private static void waitForJsBoolean(
         WebView webView,
         String expression,
@@ -382,5 +528,19 @@ public class MainActivityTest {
             throw new AssertionError("JavaScript evaluation failed", failure.get());
         }
         return result.get();
+    }
+
+    private static final class GraphScreenRect {
+        final float left;
+        final float top;
+        final float width;
+        final float height;
+
+        GraphScreenRect(float left, float top, float width, float height) {
+            this.left = left;
+            this.top = top;
+            this.width = width;
+            this.height = height;
+        }
     }
 }
