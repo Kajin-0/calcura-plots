@@ -252,8 +252,10 @@ public class MainActivityTest {
     private static void injectGraphPan(WebView webView) throws Exception {
         GraphScreenRect graph = graphScreenRect(webView);
 
-        float startX = graph.left + graph.width * 0.68f;
-        float endX = graph.left + graph.width * 0.32f;
+        // Keep the semantic exclusion x=1 inside the viewport while still
+        // producing a material D3 pan/redraw.
+        float startX = graph.left + graph.width * 0.45f;
+        float endX = graph.left + graph.width * 0.55f;
         float y = graph.top + graph.height * 0.50f;
         long downTime = SystemClock.uptimeMillis();
         MotionEvent.PointerProperties pointer = pointerProperties(0);
@@ -302,8 +304,10 @@ public class MainActivityTest {
 
         float centerX = graph.left + graph.width / 2f;
         float centerY = graph.top + graph.height / 2f;
-        float startHalfSpan = Math.max(18f, graph.width * 0.07f);
-        float endHalfSpan = Math.max(70f, graph.width * 0.28f);
+        // Moderate zoom keeps x=1 visible after the preceding controlled pan
+        // so the semantic-hole persistence assertion remains meaningful.
+        float startHalfSpan = Math.max(30f, graph.width * 0.12f);
+        float endHalfSpan = Math.max(60f, graph.width * 0.20f);
 
         long downTime = SystemClock.uptimeMillis();
 
