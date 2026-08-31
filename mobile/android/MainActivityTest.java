@@ -452,17 +452,10 @@ public class MainActivityTest {
     private static void injectToDisplay(WebView webView, MotionEvent event) {
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         try {
-            if (
-                android.os.Build.VERSION.SDK_INT >= 29 &&
-                webView.getDisplay() != null
-            ) {
-                event.setDisplayId(webView.getDisplay().getDisplayId());
-            }
-
-            assertTrue(
-                "UiAutomation must inject graph-targeted touchscreen event",
-                instrumentation.getUiAutomation().injectInputEvent(event, true)
-            );
+            // Public instrumentation API for synchronous pointer injection.
+            // The event coordinates are absolute display coordinates computed
+            // from the real WebView + graph DOM bounds.
+            instrumentation.sendPointerSync(event);
         } finally {
             event.recycle();
         }
