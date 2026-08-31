@@ -26,6 +26,7 @@ function NumberField({
     <label className="number-field">
       <span>{label}</span>
       <input
+        aria-label={label}
         type="number"
         value={value}
         step="any"
@@ -76,16 +77,18 @@ export default function App() {
           <p className="eyebrow">Standalone integration lab</p>
           <h1>Calcura Plots</h1>
           <p className="subtitle">
-            Phase 1: verify function-plot in isolation before any Calcura integration.
+            Phase 2: characterize function-plot correctness and interaction behavior before
+            any Calcura integration.
           </p>
         </div>
-        <span className="phase-badge">Phase 1</span>
+        <span className="phase-badge">Phase 2</span>
       </header>
 
       <section className="control-panel" aria-label="Plot controls">
         <label className="field preset-field">
           <span>Preset</span>
           <select
+            aria-label="Plot preset"
             value={selectedPresetId}
             onChange={(event) => applyPreset(event.target.value)}
           >
@@ -148,8 +151,8 @@ export default function App() {
       </section>
 
       <footer className="lab-note">
-        Phase 1 deliberately uses function-plot expression syntax directly. Calcura LaTeX
-        parsing, validation, and a permanent graph abstraction belong to later phases.
+        Phase 2 intentionally tests function-plot as a package. Calcura LaTeX parsing,
+        evaluator ownership, and a permanent graph contract remain out of scope.
       </footer>
     </main>
   )

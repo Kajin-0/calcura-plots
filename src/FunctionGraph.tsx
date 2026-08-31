@@ -115,6 +115,7 @@ export default function FunctionGraph({
       <div
         ref={hostRef}
         className="graph-host"
+        data-testid="graph-host"
         role="img"
         aria-label={'Graph of ' + expression}
       />
