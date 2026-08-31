@@ -197,7 +197,7 @@ public class MainActivityTest {
     }
 
     private static void injectGraphPan(WebView webView) throws Exception {
-        GraphScreenRect graph = graphViewRect(webView);
+        GraphScreenRect graph = graphScreenRect(webView);
 
         float startX = graph.left + graph.width * 0.68f;
         float endX = graph.left + graph.width * 0.32f;
@@ -205,7 +205,7 @@ public class MainActivityTest {
         long downTime = SystemClock.uptimeMillis();
         MotionEvent.PointerProperties pointer = pointerProperties(0);
 
-        dispatchToWebView(
+        injectToDisplay(
             webView,
             event(
                 downTime,
@@ -219,7 +219,7 @@ public class MainActivityTest {
         for (int step = 1; step <= 10; step++) {
             float t = step / 10f;
             float x = startX + (endX - startX) * t;
-            dispatchToWebView(
+            injectToDisplay(
                 webView,
                 event(
                     downTime,
@@ -232,7 +232,7 @@ public class MainActivityTest {
             SystemClock.sleep(20L);
         }
 
-        dispatchToWebView(
+        injectToDisplay(
             webView,
             event(
                 downTime,
@@ -245,7 +245,7 @@ public class MainActivityTest {
     }
 
     private static void injectPinchOpen(WebView webView) throws Exception {
-        GraphScreenRect graph = graphViewRect(webView);
+        GraphScreenRect graph = graphScreenRect(webView);
 
         float centerX = graph.left + graph.width / 2f;
         float centerY = graph.top + graph.height / 2f;
@@ -257,7 +257,7 @@ public class MainActivityTest {
         MotionEvent.PointerProperties p0 = pointerProperties(0);
         MotionEvent.PointerProperties p1 = pointerProperties(1);
 
-        dispatchToWebView(
+        injectToDisplay(
             webView,
             event(
                 downTime,
@@ -268,7 +268,7 @@ public class MainActivityTest {
             )
         );
 
-        dispatchToWebView(
+        injectToDisplay(
             webView,
             event(
                 downTime,
@@ -285,7 +285,7 @@ public class MainActivityTest {
         for (int step = 1; step <= 10; step++) {
             float t = step / 10f;
             float halfSpan = startHalfSpan + (endHalfSpan - startHalfSpan) * t;
-            dispatchToWebView(
+            injectToDisplay(
                 webView,
                 event(
                     downTime,
@@ -301,7 +301,7 @@ public class MainActivityTest {
             SystemClock.sleep(22L);
         }
 
-        dispatchToWebView(
+        injectToDisplay(
             webView,
             event(
                 downTime,
@@ -315,7 +315,7 @@ public class MainActivityTest {
             )
         );
 
-        dispatchToWebView(
+        injectToDisplay(
             webView,
             event(
                 downTime,
@@ -327,7 +327,7 @@ public class MainActivityTest {
         );
     }
 
-    private static GraphScreenRect graphViewRect(WebView webView) throws Exception {
+    private static GraphScreenRect graphScreenRect(WebView webView) throws Exception {
         int cssLeft = evalJsInt(
             webView,
             "document.querySelector('[data-testid=graph-host]').getBoundingClientRect().left"
@@ -347,9 +347,11 @@ public class MainActivityTest {
         int innerWidth = evalJsInt(webView, "window.innerWidth");
         int innerHeight = evalJsInt(webView, "window.innerHeight");
 
+        int[] location = new int[2];
         int[] dimensions = new int[2];
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
+            webView.getLocationOnScreen(location);
             dimensions[0] = webView.getWidth();
             dimensions[1] = webView.getHeight();
         });
@@ -357,10 +359,10 @@ public class MainActivityTest {
         float scaleX = dimensions[0] / (float) Math.max(1, innerWidth);
         float scaleY = dimensions[1] / (float) Math.max(1, innerHeight);
 
-        // dispatchTouchEvent() consumes coordinates local to the WebView.
+        // UiAutomation injects global display coordinates, not WebView-local ones.
         return new GraphScreenRect(
-            cssLeft * scaleX,
-            cssTop * scaleY,
+            location[0] + cssLeft * scaleX,
+            location[1] + cssTop * scaleY,
             cssWidth * scaleX,
             cssHeight * scaleY
         );
@@ -407,15 +409,19 @@ public class MainActivityTest {
         );
     }
 
-    private static void dispatchToWebView(WebView webView, MotionEvent event) {
-        AtomicReference<Boolean> handled = new AtomicReference<>(false);
+    private static void injectToDisplay(WebView webView, MotionEvent event) {
+        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         try {
-            InstrumentationRegistry.getInstrumentation().runOnMainSync(() ->
-                handled.set(webView.dispatchTouchEvent(event))
-            );
+            if (
+                android.os.Build.VERSION.SDK_INT >= 29 &&
+                webView.getDisplay() != null
+            ) {
+                event.setDisplayId(webView.getDisplay().getDisplayId());
+            }
+
             assertTrue(
-                "Capacitor WebView must handle native touchscreen MotionEvent",
-                handled.get()
+                "UiAutomation must inject graph-targeted touchscreen event",
+                instrumentation.getUiAutomation().injectInputEvent(event, true)
             );
         } finally {
             event.recycle();
