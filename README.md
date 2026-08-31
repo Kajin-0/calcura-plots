@@ -2,9 +2,9 @@
 
 Standalone graphing lab and package-ready graph module for an eventual Calcura function-graph feature.
 
-## Current phase: Phase 5
+## Current phase: Phase 6
 
-The project now has a deliberately small reusable public API, Calcura serialized-LaTeX adapter helpers, a standalone library build, and browser-certified multiple-curve rendering.
+The project now includes Capacitor/Android WebView certification in addition to the reusable package boundary established in Phase 5.
 
 Stack:
 
@@ -16,10 +16,9 @@ Stack:
 - explicit domain and excluded-point semantics
 - semantic open-circle overlays for removable discontinuities
 - multiple simultaneous curves
-- Node unit/corpus tests
-- compile-only public API consumer test
+- package-ready ESM + declaration build
 - Playwright Chromium browser regressions
-- separate demo and library builds
+- Capacitor 8 Android instrumentation on API 24 and API 36
 
 No Calcura source code is imported or modified.
 
@@ -54,6 +53,43 @@ const functions = createCalcuraGraphFunctions([
 
 The public surface intentionally does not expose parser/compiler internals.
 
+## Android certification
+
+The repository deliberately does not commit generated Capacitor Android boilerplate.
+
+CI creates a fresh Android project and verifies Calcura-compatible constraints:
+
+```text
+Capacitor 8
+minSdk 24
+compileSdk 36
+targetSdk 36
+https://localhost local origin
+mixed content disabled
+INTERNET permission absent
+cleartext traffic disabled
+```
+
+It builds one app APK + one instrumentation APK, then runs those exact binaries on:
+
+```text
+Android API 24
+Android API 36
+```
+
+The instrumentation test uses the real Capacitor WebView and checks:
+
+- initial graph render
+- multiple curves
+- semantic holes
+- native one-finger pan
+- native two-finger pinch
+- responsive orientation resize
+- lifecycle resume
+- local HTTPS origin
+
+See `docs/PHASE6_ANDROID_CERTIFICATION.md`.
+
 ## Library artifact
 
 ```bash
@@ -73,25 +109,9 @@ dist-lib/
 
 React, `function-plot`, and `mathjs` stay external. The wrapper does not duplicate those runtimes in its output.
 
-## Styling
+## Local validation
 
-Reusable graph styles are scoped under:
-
-```css
-.calcura-function-graph
-```
-
-and can be adjusted by host CSS custom properties such as:
-
-```css
---calcura-plot-background
---calcura-plot-axis-text
---calcura-plot-error-background
-```
-
-The lab's application chrome is not part of the library build.
-
-## Validation
+Android Studio is not required for the normal browser/library tests:
 
 ```bash
 npm install
@@ -104,7 +124,16 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-GitHub Actions runs the full sequence automatically.
+For Android generation/build on a machine with the Android SDK and Java installed:
+
+```bash
+npm run android:cert:prepare
+npm run android:cert:verify
+cd android
+./gradlew assembleDebug assembleAndroidTest
+```
+
+GitHub Actions performs the emulator certification automatically.
 
 See:
 
@@ -112,3 +141,4 @@ See:
 - `docs/PHASE3_ARCHITECTURE.md`
 - `docs/PHASE4_INPUT_COMPATIBILITY.md`
 - `docs/PHASE5_INTEGRATION_READINESS.md`
+- `docs/PHASE6_ANDROID_CERTIFICATION.md`

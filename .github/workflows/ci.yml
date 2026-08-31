@@ -51,3 +51,110 @@ jobs:
             test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  android-build-cert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Use Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 36 platform
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Generate Capacitor Android certification project
+        run: npm run android:cert:prepare
+
+      - name: Verify Calcura Android constraints
+        run: npm run android:cert:verify
+
+      - name: Build app and instrumentation APKs
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug assembleAndroidTest
+
+      - name: Upload Android certification APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: calcura-plots-android-cert-apks
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          if-no-files-found: error
+          retention-days: 7
+
+  android-webview-cert:
+    needs: android-build-cert
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [24, 36]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download certification APKs
+        uses: actions/download-artifact@v4
+        with:
+          name: calcura-plots-android-cert-apks
+          path: android-apks
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run real Capacitor WebView certification
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: >-
+            -no-snapshot
+            -no-window
+            -no-audio
+            -no-boot-anim
+            -camera-back none
+          script: |
+            APP_APK="$(find android-apks -name 'app-debug.apk' -print -quit)"
+            TEST_APK="$(find android-apks -name 'app-debug-androidTest.apk' -print -quit)"
+            test -n "$APP_APK"
+            test -n "$TEST_APK"
+            adb install -r "$APP_APK"
+            adb install -r "$TEST_APK"
+            adb shell am instrument -w -r \
+              com.calcura.plotslab.test/androidx.test.runner.AndroidJUnitRunner \
+              | tee "android-cert-api-${{ matrix.api-level }}.txt"
+            grep -q "OK (1 test)" "android-cert-api-${{ matrix.api-level }}.txt"
+            grep -q "CALCURA_PLOTS_ANDROID_CERT" "android-cert-api-${{ matrix.api-level }}.txt"
+
+      - name: Upload Android certification log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-cert-api-${{ matrix.api-level }}
+          path: android-cert-api-${{ matrix.api-level }}.txt
+          if-no-files-found: ignore
+          retention-days: 7

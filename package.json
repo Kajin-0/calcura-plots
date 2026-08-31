@@ -1,7 +1,7 @@
 {
   "name": "calcura-plots",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.6.0",
   "type": "module",
   "files": [
     "dist-lib"
@@ -27,9 +27,13 @@
     "test:public-api": "tsc -p tsconfig.consumer.json --noEmit",
     "test:unit": "node --import tsx --test tests/unit/*.test.ts",
     "test:e2e": "playwright test",
+    "android:cert:prepare": "npm run build:app && rm -rf android && npx cap add android && npx cap sync android && node scripts/prepare-android-cert.mjs",
+    "android:cert:verify": "node scripts/verify-android-cert.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "8.0.0",
+    "@capacitor/core": "8.0.0",
     "function-plot": "1.25.4",
     "mathjs": "12.4.0"
   },
@@ -37,6 +41,7 @@
     "react": ">=18 <20"
   },
   "devDependencies": {
+    "@capacitor/cli": "8.0.0",
     "@playwright/test": "^1.55.0",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
