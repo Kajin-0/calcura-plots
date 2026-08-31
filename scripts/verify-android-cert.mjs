@@ -72,7 +72,7 @@ console.log(
     androidScheme: 'https',
     allowMixedContent: false,
     internetPermission: false,
-    nativePanTest: true,
-    nativePinchTest: true,
+    nativePanTest: 'graph-targeted',
+    nativePinchTest: 'graph-targeted-two-pointer',
   }),
 )
