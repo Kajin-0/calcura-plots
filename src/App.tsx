@@ -94,11 +94,11 @@ export default function App() {
           <p className="eyebrow">Standalone integration lab</p>
           <h1>Calcura Plots</h1>
           <p className="subtitle">
-            Phase 3: Calcura-owned expression and domain semantics with function-plot isolated
-            as the rendering backend.
+            Phase 4: consume Calcura-style serialized LaTeX while preserving the
+            standalone graph safety and domain boundary.
           </p>
         </div>
-        <span className="phase-badge">Phase 3</span>
+        <span className="phase-badge">Phase 4</span>
       </header>
 
       <section className="control-panel" aria-label="Plot controls">
@@ -118,7 +118,7 @@ export default function App() {
         </label>
 
         <label className="field expression-field">
-          <span>f(x)</span>
+          <span>Calcura LaTeX</span>
           <input
             type="text"
             spellCheck={false}
@@ -127,6 +127,7 @@ export default function App() {
               setDefinition((current) => ({
                 ...current,
                 expression: event.target.value,
+                inputFormat: 'latex',
                 domain: undefined,
                 exclusions: undefined,
               }))
@@ -163,7 +164,7 @@ export default function App() {
       <section className="plot-panel" aria-label="Function plot">
         <div className="plot-heading">
           <div>
-            <span className="plot-label">Current expression</span>
+            <span className="plot-label">Current source</span>
             <code>{definition.expression || '—'}</code>
           </div>
           <span className="interaction-note">Drag to pan · scroll/pinch to zoom</span>
@@ -173,9 +174,9 @@ export default function App() {
       </section>
 
       <footer className="lab-note">
-        Expressions are now parsed and validated by the graph adapter using the same
-        mathjs version as Calcura. function-plot receives numeric callbacks and no longer
-        owns expression semantics.
+        The lab now takes the same style of serialized LaTeX produced by Calcura's
+        Mathfield. Conversion is graph-only; grading, equivalence, integration, and
+        symbolic simplification remain outside this repository.
       </footer>
     </main>
   )

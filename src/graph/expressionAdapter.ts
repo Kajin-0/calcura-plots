@@ -7,6 +7,10 @@ import {
   type ParenthesisNode,
   type SymbolNode,
 } from 'mathjs'
+import {
+  GraphLatexError,
+  latexToGraphExpression,
+} from './latexToGraphExpression'
 import type {
   CompiledGraphFunction,
   GraphExclusion,
@@ -130,6 +134,13 @@ function validateDefinition(definition: GraphFunctionDefinition): string {
     throw new GraphExpressionError('Graph expression must not be empty.')
   }
 
+  const inputFormat = definition.inputFormat ?? 'mathjs'
+  if (inputFormat !== 'mathjs' && inputFormat !== 'latex') {
+    throw new GraphExpressionError(
+      `Graph input format "${String(inputFormat)}" is not supported.`,
+    )
+  }
+
   const variable = definition.variable ?? 'x'
   if (!IDENTIFIER.test(variable) || ALLOWED_CONSTANTS.has(variable)) {
     throw new GraphExpressionError(`Variable "${variable}" is not a valid graph variable.`)
@@ -159,6 +170,21 @@ function validateDefinition(definition: GraphFunctionDefinition): string {
   return variable
 }
 
+function normalizeSourceExpression(definition: GraphFunctionDefinition): string {
+  if ((definition.inputFormat ?? 'mathjs') === 'mathjs') {
+    return definition.expression
+  }
+
+  try {
+    return latexToGraphExpression(definition.expression)
+  } catch (error) {
+    if (error instanceof GraphLatexError) {
+      throw new GraphExpressionError(error.message)
+    }
+    throw error
+  }
+}
+
 function asFiniteReal(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : Number.NaN
 }
@@ -171,10 +197,15 @@ export function compileGraphFunction(
   definition: GraphFunctionDefinition,
 ): CompiledGraphFunction {
   const variable = validateDefinition(definition)
+  const normalizedExpression = normalizeSourceExpression(definition)
+
+  if (!normalizedExpression.trim()) {
+    throw new GraphExpressionError('Graph expression must not be empty after normalization.')
+  }
 
   let root: MathNode
   try {
-    root = math.parse(definition.expression)
+    root = math.parse(normalizedExpression)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     throw new GraphExpressionError(`Unable to parse graph expression: ${message}`)
@@ -228,6 +259,7 @@ export function compileGraphFunction(
   return {
     definition,
     variable,
+    normalizedExpression,
     evaluate,
     evaluateRaw,
     resolvedExclusions,

@@ -24,14 +24,26 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator(curvePath).first()).toBeVisible()
 })
 
-test('smooth functions render through the Calcura-owned evaluator', async ({ page }) => {
+test('smooth Calcura LaTeX functions render through the owned evaluator', async ({
+  page,
+}) => {
   for (const preset of ['parabola', 'sine', 'sinc']) {
     await selectPreset(page, preset)
     expect(await curvePathCount(page)).toBeGreaterThanOrEqual(1)
   }
 })
 
-test('1/x remains split across its vertical asymptote with callback evaluation', async ({
+test('direct Calcura-style fraction/trig LaTeX can be typed into the lab', async ({
+  page,
+}) => {
+  const expressionInput = page.getByRole('textbox', { name: 'Function expression' })
+  await expressionInput.fill('\\frac{\\sin(x)}{x}')
+
+  await expect(page.locator('[role="alert"]')).toHaveCount(0)
+  await expect(page.locator(curvePath).first()).toBeVisible()
+})
+
+test('1/x remains split across its vertical asymptote after LaTeX conversion', async ({
   page,
 }) => {
   await selectPreset(page, 'reciprocal')
@@ -87,7 +99,9 @@ test('semantic hole marker tracks interactive pan redraws', async ({ page }) => 
   await expect(page.locator(semanticHole)).toHaveCount(1)
 })
 
-test('sin(1/x) retains strong segmentation through the safe evaluator', async ({ page }) => {
+test('sin(1/x) retains strong segmentation through LaTeX and safe evaluation', async ({
+  page,
+}) => {
   await selectPreset(page, 'oscillatory')
 
   const paths = await curvePathCount(page)
@@ -95,8 +109,8 @@ test('sin(1/x) retains strong segmentation through the safe evaluator', async ({
 
   console.log(
     JSON.stringify({
-      audit: 'oscillatory-origin-phase3',
-      expression: 'sin(1 / x)',
+      audit: 'oscillatory-origin-phase4',
+      expression: '\\sin(\\frac{1}{x})',
       pathCount: paths,
       firstPathLength: d?.length ?? 0,
     }),
@@ -106,7 +120,7 @@ test('sin(1/x) retains strong segmentation through the safe evaluator', async ({
   expect(d?.length ?? 0).toBeGreaterThan(0)
 })
 
-test('unsafe assignment is rejected before reaching function-plot', async ({ page }) => {
+test('unsafe assignment is rejected after LaTeX normalization', async ({ page }) => {
   const expressionInput = page.getByRole('textbox', { name: 'Function expression' })
 
   await expressionInput.fill('x = 4')
@@ -117,21 +131,31 @@ test('unsafe assignment is rejected before reaching function-plot', async ({ pag
   await expect(page.locator('[role="alert"]')).toHaveCount(0)
 })
 
-test('unknown symbols are rejected and valid input recovers', async ({ page }) => {
+test('unknown symbols are rejected and valid LaTeX input recovers', async ({ page }) => {
   const expressionInput = page.getByRole('textbox', { name: 'Function expression' })
 
   await expressionInput.fill('x + y')
   await expect(page.locator('[role="alert"]')).toContainText('Symbol "y" is not allowed')
 
-  await expressionInput.fill('cos(x)')
+  await expressionInput.fill('\\cos(x)')
   await expect(page.locator('[role="alert"]')).toHaveCount(0)
   await expect(page.locator(curvePath).first()).toBeVisible()
+})
+
+test('unsupported calculus LaTeX is rejected before the renderer', async ({ page }) => {
+  const expressionInput = page.getByRole('textbox', { name: 'Function expression' })
+
+  await expressionInput.fill('\\int x\\,dx')
+  await expect(page.locator('[role="alert"]')).toContainText(
+    'outside the Cartesian function-graph grammar',
+  )
+  await expect(page.locator(curvePath)).toHaveCount(0)
 })
 
 test('invalid syntax reports an adapter parse error and recovers', async ({ page }) => {
   const expressionInput = page.getByRole('textbox', { name: 'Function expression' })
 
-  await expressionInput.fill('sin(')
+  await expressionInput.fill('\\sin(')
   await expect(page.locator('[role="alert"]')).toContainText('Unable to parse')
 
   await selectPreset(page, 'sine')
@@ -196,7 +220,7 @@ test('drag pan changes rendered curve geometry', async ({ page }) => {
   await expect.poll(() => firstCurveD(page)).not.toBe(before)
 })
 
-test('mobile viewport remains usable with callback evaluator and semantic layer', async ({
+test('mobile viewport remains usable with LaTeX input and semantic layer', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })

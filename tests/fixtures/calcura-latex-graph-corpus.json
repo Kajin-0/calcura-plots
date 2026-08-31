@@ -1,0 +1,20 @@
+[
+  {"latex":"x^2","x":3,"expected":9},
+  {"latex":"\\frac{x^2-1}{x-1}","x":2,"expected":3},
+  {"latex":"\\sin(x)","x":1.5707963267948966,"expected":1},
+  {"latex":"\\sin^2(x)","x":1.5707963267948966,"expected":1},
+  {"latex":"\\sin(x)^2","x":1.5707963267948966,"expected":1},
+  {"latex":"2x+3","x":4,"expected":11},
+  {"latex":"3\\sin(2x)","x":0.7853981633974483,"expected":3},
+  {"latex":"\\sqrt{x}","x":9,"expected":3},
+  {"latex":"\\sqrt[3]{x}","x":-8,"expected":-2},
+  {"latex":"\\ln|x|","x":2.718281828459045,"expected":1},
+  {"latex":"\\log(x)","x":2.718281828459045,"expected":1},
+  {"latex":"e^{2x}","x":1,"expected":7.38905609893065},
+  {"latex":"\\pi x","x":2,"expected":6.283185307179586},
+  {"latex":"(x+1)(x-1)","x":3,"expected":8},
+  {"latex":"\\left(\\frac{x+1}{x-1}\\right)","x":3,"expected":2},
+  {"latex":"|x-3|","x":1,"expected":2},
+  {"latex":"\\arcsin(x)","x":1,"expected":1.5707963267948966},
+  {"latex":"\\sinh(x)","x":0,"expected":0}
+]
