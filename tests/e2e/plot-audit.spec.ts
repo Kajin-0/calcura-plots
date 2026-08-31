@@ -69,7 +69,7 @@ test('removable discontinuity receives an explicit semantic hole marker', async 
   expect(Number.isFinite(cy)).toBe(true)
 })
 
-test('semantic hole marker tracks zoom redraws', async ({ page }) => {
+test('semantic hole marker tracks interactive pan redraws', async ({ page }) => {
   await selectPreset(page, 'removable')
   const hole = page.locator(semanticHole)
   const beforeCx = await hole.getAttribute('cx')
@@ -77,10 +77,14 @@ test('semantic hole marker tracks zoom redraws', async ({ page }) => {
   const box = await page.locator(graphHost).boundingBox()
   expect(box).not.toBeNull()
 
-  await page.mouse.move(box!.x + box!.width * 0.7, box!.y + box!.height / 2)
-  await page.mouse.wheel(0, -700)
+  const y = box!.y + box!.height / 2
+  await page.mouse.move(box!.x + box!.width * 0.45, y)
+  await page.mouse.down()
+  await page.mouse.move(box!.x + box!.width * 0.65, y, { steps: 8 })
+  await page.mouse.up()
 
   await expect.poll(() => hole.getAttribute('cx')).not.toBe(beforeCx)
+  await expect(page.locator(semanticHole)).toHaveCount(1)
 })
 
 test('sin(1/x) retains strong segmentation through the safe evaluator', async ({ page }) => {
