@@ -1,4 +1,10 @@
-import { mkdir, readFile, writeFile, copyFile } from 'node:fs/promises'
+import {
+  copyFile,
+  mkdir,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 const manifestPath = 'android/app/src/main/AndroidManifest.xml'
@@ -6,6 +12,8 @@ const variablesPath = 'android/variables.gradle'
 const testSource = 'mobile/android/MainActivityTest.java'
 const testDestination =
   'android/app/src/androidTest/java/com/calcura/plotslab/MainActivityTest.java'
+const capacitorTemplateTest =
+  'android/app/src/androidTest/java/com/getcapacitor/myapp/ExampleInstrumentedTest.java'
 
 let manifest = await readFile(manifestPath, 'utf8')
 
@@ -32,6 +40,10 @@ variables = variables
   .replace(/targetSdkVersion\s*=\s*\d+/, 'targetSdkVersion = 36')
 await writeFile(variablesPath, variables)
 
+// The Capacitor template test hard-codes its default package id. It is template
+// noise, not part of this certification surface.
+await rm(capacitorTemplateTest, { force: true })
+
 await mkdir(dirname(testDestination), { recursive: true })
 await copyFile(testSource, testDestination)
 
@@ -44,5 +56,6 @@ console.log(
     targetSdk: 36,
     internetPermission: false,
     cleartextTraffic: false,
+    templateInstrumentationTestRemoved: true,
   }),
 )
