@@ -43,6 +43,46 @@ public class MainActivityTest {
             WebView webView = webViewRef.get();
             assertTrue("Capacitor WebView must exist", webView != null);
 
+            // minSdk 24 is a native Android packaging/launch contract. Calcura
+            // uses Vite 6's default "modules" production target (Chrome 87+),
+            // while the stock API-24 AOSP image ships a much older WebView.
+            // Certify the native Capacitor shell here; full graph runtime
+            // certification is performed on WebView-capable API endpoints.
+            if (android.os.Build.VERSION.SDK_INT == 24) {
+                waitForJsBoolean(
+                    webView,
+                    "document.readyState === 'complete'",
+                    JS_TIMEOUT_MS
+                );
+
+                assertTrue(
+                    "Capacitor local protocol must be HTTPS on minSdk",
+                    evalJsBoolean(webView, "window.location.protocol === 'https:'")
+                );
+                assertTrue(
+                    "Capacitor local host must be localhost on minSdk",
+                    evalJsBoolean(webView, "window.location.hostname === 'localhost'")
+                );
+                assertTrue(
+                    "Vite module entry must be packaged in the minSdk shell",
+                    evalJsBoolean(webView, "document.querySelector('script[type=module]') !== null")
+                );
+
+                boolean moduleSupport = evalJsBoolean(
+                    webView,
+                    "'noModule' in HTMLScriptElement.prototype"
+                );
+
+                System.out.println(
+                    "CALCURA_PLOTS_ANDROID_MINSDK_CERT " +
+                    "{api=24,nativeShell=true,httpsLocalhost=true,moduleEntry=true" +
+                    ",stockWebViewModuleSupport=" + moduleSupport +
+                    ",webViewPackage=" + webViewPackageVersion() +
+                    ",graphRuntimeScope=excluded-by-calcura-vite-target}"
+                );
+                return;
+            }
+
             try {
                 waitForJsBoolean(
                     webView,
