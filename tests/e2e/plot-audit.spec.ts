@@ -220,6 +220,28 @@ test('drag pan changes rendered curve geometry', async ({ page }) => {
   await expect.poll(() => firstCurveD(page)).not.toBe(before)
 })
 
+test('multiple curves render independently with semantic metadata preserved', async ({ page }) => {
+  await selectPreset(page, 'multi-curve')
+
+  const firstSeries = page.locator(`${graphHost} path.line.line-0`).first()
+  const secondSeries = page.locator(`${graphHost} path.line.line-1`).first()
+
+  await expect(firstSeries).toBeVisible()
+  await expect(secondSeries).toBeVisible()
+
+  const [firstStroke, secondStroke] = await Promise.all([
+    firstSeries.evaluate((element) => getComputedStyle(element).stroke),
+    secondSeries.evaluate((element) => getComputedStyle(element).stroke),
+  ])
+
+  expect(firstStroke).not.toBe(secondStroke)
+
+  const hole = page.locator(semanticHole)
+  await expect(hole).toHaveCount(1)
+  await expect(hole).toHaveAttribute('data-function-id', 'line-with-hole')
+  await expect(hole).toHaveAttribute('data-function-index', '1')
+})
+
 test('mobile viewport remains usable with LaTeX input and semantic layer', async ({
   page,
 }) => {

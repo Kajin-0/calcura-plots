@@ -1,10 +1,10 @@
 # Calcura Plots
 
-Standalone graphing lab for validating an eventual Calcura function-graph feature without modifying Calcura.
+Standalone graphing lab and package-ready graph module for an eventual Calcura function-graph feature.
 
-## Current phase: Phase 4
+## Current phase: Phase 5
 
-The project now accepts Calcura-style serialized LaTeX while keeping mathematical expression semantics and rendering isolated.
+The project now has a deliberately small reusable public API, Calcura serialized-LaTeX adapter helpers, a standalone library build, and browser-certified multiple-curve rendering.
 
 Stack:
 
@@ -15,84 +15,36 @@ Stack:
 - strict graph-expression AST whitelist
 - explicit domain and excluded-point semantics
 - semantic open-circle overlays for removable discontinuities
+- multiple simultaneous curves
 - Node unit/corpus tests
+- compile-only public API consumer test
 - Playwright Chromium browser regressions
-- GitHub Actions validation
+- separate demo and library builds
 
 No Calcura source code is imported or modified.
 
-## Architecture
-
-```text
-Calcura-style serialized LaTeX
-        ↓
-latexToGraphExpression
-        ↓
-strict mathjs AST validation
-        ↓
-safe real f(x) callback
-        ↓
-FunctionGraph
-        ↓
-function-plot
-
-semantic exclusions ──────→ open-circle SVG overlay
-```
-
-See:
-
-- `docs/PHASE2_AUDIT.md`
-- `docs/PHASE3_ARCHITECTURE.md`
-- `docs/PHASE4_INPUT_COMPATIBILITY.md`
-
-## Run locally
-
-Local installation is optional unless you want to run the lab yourself.
-
-```bash
-npm install
-npx playwright install chromium
-npm run dev
-```
-
-Validation:
-
-```bash
-npm run test:unit
-npm run typecheck
-npm run build
-npm run test:e2e
-```
-
-GitHub Actions runs the validation automatically on every push to `main`.
-
-## Current graph contract
+## Public API
 
 ```ts
-type GraphInputFormat = 'mathjs' | 'latex'
-
-interface GraphFunctionDefinition {
-  id: string
-  expression: string
-  inputFormat?: GraphInputFormat
-  variable?: string
-  domain?: [number, number]
-  exclusions?: Array<{ x: number; y?: number }>
-  color?: string
-}
+import {
+  FunctionGraph,
+  createCalcuraGraphFunctions,
+  type PlotViewport,
+} from 'calcura-plots'
 ```
 
-An eventual Calcura call can pass its serialized Mathfield LaTeX directly:
+An eventual Calcura caller can do:
 
 ```tsx
+const functions = createCalcuraGraphFunctions([
+  {
+    id: 'integrand',
+    latex: serializedMathfieldLatex,
+  },
+])
+
 <FunctionGraph
-  functions={[
-    {
-      id: 'f',
-      expression: serializedLatex,
-      inputFormat: 'latex',
-    },
-  ]}
+  functions={functions}
   viewport={{
     x: [-10, 10],
     y: [-10, 10],
@@ -100,4 +52,63 @@ An eventual Calcura call can pass its serialized Mathfield LaTeX directly:
 />
 ```
 
-The graph repository remains independent of Calcura's grading/equivalence machinery.
+The public surface intentionally does not expose parser/compiler internals.
+
+## Library artifact
+
+```bash
+npm run build:lib
+npm run verify:lib
+```
+
+produces:
+
+```text
+dist-lib/
+├── calcura-plots.js
+├── calcura-plots.css
+└── types/
+    └── index.d.ts
+```
+
+React, `function-plot`, and `mathjs` stay external. The wrapper does not duplicate those runtimes in its output.
+
+## Styling
+
+Reusable graph styles are scoped under:
+
+```css
+.calcura-function-graph
+```
+
+and can be adjusted by host CSS custom properties such as:
+
+```css
+--calcura-plot-background
+--calcura-plot-axis-text
+--calcura-plot-error-background
+```
+
+The lab's application chrome is not part of the library build.
+
+## Validation
+
+```bash
+npm install
+npm run test:unit
+npm run typecheck
+npm run test:public-api
+npm run build
+npm run verify:lib
+npx playwright install chromium
+npm run test:e2e
+```
+
+GitHub Actions runs the full sequence automatically.
+
+See:
+
+- `docs/PHASE2_AUDIT.md`
+- `docs/PHASE3_ARCHITECTURE.md`
+- `docs/PHASE4_INPUT_COMPATIBILITY.md`
+- `docs/PHASE5_INTEGRATION_READINESS.md`

@@ -57,7 +57,6 @@ export function renderSemanticOverlays(
       circle.setAttribute('cx', String(cx))
       circle.setAttribute('cy', String(cy))
       circle.setAttribute('r', '5')
-      circle.setAttribute('fill', '#f7f8fb')
       circle.setAttribute('stroke', compiled.definition.color ?? '#6f5ee8')
       circle.setAttribute('stroke-width', '2.5')
       overlay.appendChild(circle)

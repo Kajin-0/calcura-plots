@@ -1,27 +1,48 @@
 {
   "name": "calcura-plots",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.5.0",
   "type": "module",
+  "files": [
+    "dist-lib"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist-lib/types/index.d.ts",
+      "import": "./dist-lib/calcura-plots.js"
+    },
+    "./style.css": "./dist-lib/calcura-plots.css"
+  },
+  "types": "./dist-lib/types/index.d.ts",
+  "sideEffects": [
+    "**/*.css"
+  ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "npm run typecheck && npm run build:app && npm run build:lib",
+    "build:app": "vite build",
+    "build:lib": "vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json",
+    "verify:lib": "node scripts/verify-library-build.mjs",
     "typecheck": "tsc --noEmit",
+    "test:public-api": "tsc -p tsconfig.consumer.json --noEmit",
     "test:unit": "node --import tsx --test tests/unit/*.test.ts",
     "test:e2e": "playwright test",
     "preview": "vite preview"
   },
   "dependencies": {
     "function-plot": "1.25.4",
-    "mathjs": "12.4.0",
-    "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "mathjs": "12.4.0"
+  },
+  "peerDependencies": {
+    "react": ">=18 <20"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
     "tsx": "^4.21.0",
     "typescript": "^5.8.3",
     "vite": "^6.1.0"

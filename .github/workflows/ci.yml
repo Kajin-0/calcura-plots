@@ -26,8 +26,14 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Build
+      - name: Public API consumer typecheck
+        run: npm run test:public-api
+
+      - name: Build demo and library
         run: npm run build
+
+      - name: Verify library artifact
+        run: npm run verify:lib
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium

@@ -11,6 +11,7 @@ import functionPlot, {
   type FunctionPlotDatumScope,
   type FunctionPlotOptions,
 } from 'function-plot'
+import './graph/FunctionGraph.css'
 import {
   compileGraphFunctions,
   GraphExpressionError,
@@ -28,10 +29,11 @@ export type {
   PlotViewport,
 } from './graph/types'
 
-interface FunctionGraphProps {
+export interface FunctionGraphProps {
   functions: GraphFunctionDefinition[]
   viewport: PlotViewport
   height?: number
+  className?: string
 }
 
 type EventedChart = Chart & {
@@ -55,6 +57,7 @@ export default function FunctionGraph({
   functions,
   viewport,
   height = 420,
+  className,
 }: FunctionGraphProps) {
   const hostRef = useRef<HTMLDivElement>(null)
   const optionsRef = useRef<FunctionPlotOptions | null>(null)
@@ -217,8 +220,12 @@ export default function FunctionGraph({
     .map((definition) => definition.expression)
     .join(', ')
 
+  const shellClassName = className
+    ? `calcura-function-graph ${className}`
+    : 'calcura-function-graph'
+
   return (
-    <div className="graph-shell">
+    <div className={shellClassName}>
       <div
         ref={hostRef}
         className="graph-host"

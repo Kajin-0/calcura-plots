@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import FunctionGraph, {
   type GraphFunctionDefinition,
   type PlotViewport,
@@ -26,6 +26,12 @@ function cloneDefinition(
   }
 }
 
+function cloneDefinitions(
+  definitions: GraphFunctionDefinition[],
+): GraphFunctionDefinition[] {
+  return definitions.map(cloneDefinition)
+}
+
 function NumberField({
   label,
   value,
@@ -51,12 +57,12 @@ function NumberField({
 
 export default function App() {
   const [selectedPresetId, setSelectedPresetId] = useState(DEFAULT_PRESET.id)
-  const [definition, setDefinition] = useState<GraphFunctionDefinition>(() =>
-    cloneDefinition(DEFAULT_PRESET.functionDefinition),
+  const [definitions, setDefinitions] = useState<GraphFunctionDefinition[]>(() =>
+    cloneDefinitions(DEFAULT_PRESET.functionDefinitions),
   )
   const [viewport, setViewport] = useState<PlotViewport>(viewportFromPreset)
 
-  const functions = useMemo(() => [definition], [definition])
+  const primaryDefinition = definitions[0]
 
   const applyPreset = (presetId: string) => {
     const preset = PLOT_PRESETS.find((candidate) => candidate.id === presetId)
@@ -65,7 +71,7 @@ export default function App() {
     }
 
     setSelectedPresetId(preset.id)
-    setDefinition(cloneDefinition(preset.functionDefinition))
+    setDefinitions(cloneDefinitions(preset.functionDefinitions))
     setViewport({
       x: [...preset.xDomain],
       y: [...preset.yDomain],
@@ -94,11 +100,11 @@ export default function App() {
           <p className="eyebrow">Standalone integration lab</p>
           <h1>Calcura Plots</h1>
           <p className="subtitle">
-            Phase 4: consume Calcura-style serialized LaTeX while preserving the
-            standalone graph safety and domain boundary.
+            Phase 5: package-ready public API, multiple-curve proof, and a minimal
+            Calcura-facing serialized-LaTeX adapter.
           </p>
         </div>
-        <span className="phase-badge">Phase 4</span>
+        <span className="phase-badge">Phase 5</span>
       </header>
 
       <section className="control-panel" aria-label="Plot controls">
@@ -118,19 +124,28 @@ export default function App() {
         </label>
 
         <label className="field expression-field">
-          <span>Calcura LaTeX</span>
+          <span>Primary Calcura LaTeX</span>
           <input
             type="text"
             spellCheck={false}
-            value={definition.expression}
+            value={primaryDefinition?.expression ?? ''}
             onChange={(event) => {
-              setDefinition((current) => ({
-                ...current,
-                expression: event.target.value,
-                inputFormat: 'latex',
-                domain: undefined,
-                exclusions: undefined,
-              }))
+              setDefinitions((current) => {
+                const primary = current[0]
+                if (!primary) {
+                  return []
+                }
+
+                return [
+                  {
+                    ...primary,
+                    expression: event.target.value,
+                    inputFormat: 'latex',
+                    domain: undefined,
+                    exclusions: undefined,
+                  },
+                ]
+              })
               setSelectedPresetId('')
             }}
             aria-label="Function expression"
@@ -165,18 +180,21 @@ export default function App() {
         <div className="plot-heading">
           <div>
             <span className="plot-label">Current source</span>
-            <code>{definition.expression || '—'}</code>
+            <code>{primaryDefinition?.expression || '—'}</code>
           </div>
-          <span className="interaction-note">Drag to pan · scroll/pinch to zoom</span>
+          <span className="interaction-note">
+            {definitions.length} curve{definitions.length === 1 ? '' : 's'} · Drag to pan ·
+            scroll/pinch to zoom
+          </span>
         </div>
 
-        <FunctionGraph functions={functions} viewport={viewport} />
+        <FunctionGraph functions={definitions} viewport={viewport} />
       </section>
 
       <footer className="lab-note">
-        The lab now takes the same style of serialized LaTeX produced by Calcura's
-        Mathfield. Conversion is graph-only; grading, equivalence, integration, and
-        symbolic simplification remain outside this repository.
+        The library entrypoint now exposes only the reusable graph component, public
+        graph types, and Calcura serialized-LaTeX adapter helpers. The lab UI remains
+        outside the library build.
       </footer>
     </main>
   )

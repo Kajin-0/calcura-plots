@@ -1,0 +1,43 @@
+.calcura-function-graph {
+  --calcura-plot-background: #f7f8fb;
+  --calcura-plot-axis-text: #242936;
+  --calcura-plot-error-border: #d6a1a1;
+  --calcura-plot-error-background: #fff4f4;
+  --calcura-plot-error-text: #8a2323;
+
+  position: relative;
+  min-height: 420px;
+  background: var(--calcura-plot-background);
+}
+
+.calcura-function-graph .graph-host {
+  width: 100%;
+  min-height: 420px;
+  overflow: hidden;
+}
+
+.calcura-function-graph .graph-host svg.function-plot {
+  display: block;
+}
+
+.calcura-function-graph .graph-host .axis text,
+.calcura-function-graph .graph-host .top-right-legend,
+.calcura-function-graph .graph-host text {
+  fill: var(--calcura-plot-axis-text);
+}
+
+.calcura-function-graph .calcura-semantic-hole {
+  fill: var(--calcura-plot-background);
+}
+
+.calcura-function-graph .graph-error {
+  position: absolute;
+  inset: 16px 16px auto;
+  z-index: 2;
+  padding: 10px 12px;
+  border: 1px solid var(--calcura-plot-error-border);
+  border-radius: 8px;
+  background: var(--calcura-plot-error-background);
+  color: var(--calcura-plot-error-text);
+  font-size: 0.85rem;
+}
