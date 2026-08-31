@@ -3,7 +3,6 @@ package com.calcura.plotslab;
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.swipeLeft;
 import static androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
@@ -48,35 +47,50 @@ public class MainActivityTest {
             waitForJsBoolean(
                 webView,
                 "document.readyState === 'complete' && " +
-                    "document.querySelector('[data-testid=\\"graph-host\\"] path.line.line-0') !== null",
+                    "document.querySelector('[data-testid=graph-host] path.line.line-0') !== null",
                 JS_TIMEOUT_MS
             );
 
             long readyMs = SystemClock.elapsedRealtime() - launchStarted;
-            assertTrue("Initial graph should be ready within 10 seconds on emulator; was " + readyMs + " ms",
-                readyMs < 10_000L);
+            assertTrue(
+                "Initial graph should be ready within 10 seconds on emulator; was " + readyMs + " ms",
+                readyMs < 10_000L
+            );
 
-            assertEquals("https:", evalJsString(webView, "window.location.protocol"));
-            assertEquals("localhost", evalJsString(webView, "window.location.hostname"));
-            assertTrue(evalJsBoolean(webView,
-                "document.querySelector('[data-testid=\\"graph-host\\"] svg.function-plot') !== null"));
-            assertFalse(evalJsBoolean(webView,
-                "document.querySelector('[role=\\"alert\\"]') !== null"));
+            assertTrue(
+                "Capacitor local protocol must be HTTPS",
+                evalJsBoolean(webView, "window.location.protocol === 'https:'")
+            );
+            assertTrue(
+                "Capacitor local host must be localhost",
+                evalJsBoolean(webView, "window.location.hostname === 'localhost'")
+            );
+            assertTrue(evalJsBoolean(
+                webView,
+                "document.querySelector('[data-testid=graph-host] svg.function-plot') !== null"
+            ));
+            assertFalse(evalJsBoolean(
+                webView,
+                "document.querySelector('[role=alert]') !== null"
+            ));
 
             // Exercise the real React/UI path to a two-curve scene.
-            evalJsRaw(webView,
+            evalJsRaw(
+                webView,
                 "(() => {" +
-                    "const s=document.querySelector('select[aria-label=\\"Plot preset\\"]');" +
+                    "const s=document.querySelector(\"select[aria-label='Plot preset']\");" +
                     "s.value='multi-curve';" +
                     "s.dispatchEvent(new Event('change',{bubbles:true}));" +
                     "return true;" +
                 "})()"
             );
 
-            waitForJsBoolean(webView,
+            waitForJsBoolean(
+                webView,
                 "document.querySelector('path.line.line-1') !== null && " +
-                    "document.querySelector('circle.calcura-semantic-hole[data-function-id=\\"line-with-hole\\"]') !== null",
-                JS_TIMEOUT_MS);
+                    "document.querySelector(\"circle.calcura-semantic-hole[data-function-id='line-with-hole']\") !== null",
+                JS_TIMEOUT_MS
+            );
 
             int beforePanHash = evalJsInt(webView, curveHashJs());
 
@@ -85,52 +99,77 @@ public class MainActivityTest {
             SystemClock.sleep(450L);
 
             int afterPanHash = evalJsInt(webView, curveHashJs());
-            assertNotEquals("Android touch pan must change rendered curve geometry",
-                beforePanHash, afterPanHash);
+            assertNotEquals(
+                "Android touch pan must change rendered curve geometry",
+                beforePanHash,
+                afterPanHash
+            );
 
             int beforePinchHash = afterPanHash;
             injectPinchOpen(webView);
             SystemClock.sleep(500L);
             int afterPinchHash = evalJsInt(webView, curveHashJs());
 
-            assertNotEquals("Android two-finger pinch must change rendered curve geometry",
-                beforePinchHash, afterPinchHash);
-            assertTrue("Semantic hole must survive native pan/pinch redraws",
-                evalJsBoolean(webView,
-                    "document.querySelectorAll('circle.calcura-semantic-hole[data-function-id=\\"line-with-hole\\"]').length === 1"));
+            assertNotEquals(
+                "Android two-finger pinch must change rendered curve geometry",
+                beforePinchHash,
+                afterPinchHash
+            );
+            assertTrue(
+                "Semantic hole must survive native pan/pinch redraws",
+                evalJsBoolean(
+                    webView,
+                    "document.querySelectorAll(\"circle.calcura-semantic-hole[data-function-id='line-with-hole']\").length === 1"
+                )
+            );
 
             int portraitInnerWidth = evalJsInt(webView, "window.innerWidth");
 
             scenario.onActivity(activity ->
-                activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE));
+                activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)
+            );
 
-            waitForJsBoolean(webView,
+            waitForJsBoolean(
+                webView,
                 "window.innerWidth > " + portraitInnerWidth,
-                JS_TIMEOUT_MS);
+                JS_TIMEOUT_MS
+            );
 
             int landscapeInnerWidth = evalJsInt(webView, "window.innerWidth");
-            int landscapeSvgWidth = evalJsInt(webView,
-                "Math.round(Number(document.querySelector('svg.function-plot').getAttribute('width')))");
+            int landscapeSvgWidth = evalJsInt(
+                webView,
+                "Number(document.querySelector('svg.function-plot').getAttribute('width'))"
+            );
 
             assertTrue("Landscape WebView should widen", landscapeInnerWidth > portraitInnerWidth);
-            assertTrue("Graph SVG should resize with WebView", landscapeSvgWidth > portraitInnerWidth / 2);
-            assertFalse("No render error after Android orientation change",
-                evalJsBoolean(webView,
-                    "document.querySelector('[role=\\"alert\\"]') !== null"));
+            assertTrue(
+                "Graph SVG should resize with WebView",
+                landscapeSvgWidth > portraitInnerWidth / 2
+            );
+            assertFalse(
+                "No render error after Android orientation change",
+                evalJsBoolean(webView, "document.querySelector('[role=alert]') !== null")
+            );
 
             // Lifecycle smoke: background-style state transition then resume.
             scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED);
             SystemClock.sleep(250L);
             scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED);
 
-            waitForJsBoolean(webView,
+            waitForJsBoolean(
+                webView,
                 "document.querySelector('path.line.line-0') !== null && " +
                     "document.querySelector('path.line.line-1') !== null",
-                JS_TIMEOUT_MS);
+                JS_TIMEOUT_MS
+            );
 
-            assertTrue("Semantic overlay must survive lifecycle resume",
-                evalJsBoolean(webView,
-                    "document.querySelector('circle.calcura-semantic-hole[data-function-id=\\"line-with-hole\\"]') !== null"));
+            assertTrue(
+                "Semantic overlay must survive lifecycle resume",
+                evalJsBoolean(
+                    webView,
+                    "document.querySelector(\"circle.calcura-semantic-hole[data-function-id='line-with-hole']\") !== null"
+                )
+            );
 
             System.out.println(
                 "CALCURA_PLOTS_ANDROID_CERT " +
@@ -174,51 +213,74 @@ public class MainActivityTest {
         MotionEvent.PointerProperties p0 = pointerProperties(0);
         MotionEvent.PointerProperties p1 = pointerProperties(1);
 
-        inject(instrumentation, event(
-            downTime, downTime, MotionEvent.ACTION_DOWN,
-            new MotionEvent.PointerProperties[]{p0},
-            new MotionEvent.PointerCoords[]{coords(centerX - startHalfSpan, centerY)}
-        ));
+        inject(
+            instrumentation,
+            event(
+                downTime,
+                downTime,
+                MotionEvent.ACTION_DOWN,
+                new MotionEvent.PointerProperties[]{p0},
+                new MotionEvent.PointerCoords[]{coords(centerX - startHalfSpan, centerY)}
+            )
+        );
 
-        inject(instrumentation, event(
-            downTime, SystemClock.uptimeMillis(),
-            MotionEvent.ACTION_POINTER_DOWN | (1 << MotionEvent.ACTION_POINTER_INDEX_SHIFT),
-            new MotionEvent.PointerProperties[]{p0, p1},
-            new MotionEvent.PointerCoords[]{
-                coords(centerX - startHalfSpan, centerY),
-                coords(centerX + startHalfSpan, centerY)
-            }
-        ));
+        inject(
+            instrumentation,
+            event(
+                downTime,
+                SystemClock.uptimeMillis(),
+                MotionEvent.ACTION_POINTER_DOWN | (1 << MotionEvent.ACTION_POINTER_INDEX_SHIFT),
+                new MotionEvent.PointerProperties[]{p0, p1},
+                new MotionEvent.PointerCoords[]{
+                    coords(centerX - startHalfSpan, centerY),
+                    coords(centerX + startHalfSpan, centerY)
+                }
+            )
+        );
 
         for (int step = 1; step <= 8; step++) {
             float t = step / 8f;
             float halfSpan = startHalfSpan + (endHalfSpan - startHalfSpan) * t;
-            inject(instrumentation, event(
-                downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_MOVE,
-                new MotionEvent.PointerProperties[]{p0, p1},
-                new MotionEvent.PointerCoords[]{
-                    coords(centerX - halfSpan, centerY),
-                    coords(centerX + halfSpan, centerY)
-                }
-            ));
+            inject(
+                instrumentation,
+                event(
+                    downTime,
+                    SystemClock.uptimeMillis(),
+                    MotionEvent.ACTION_MOVE,
+                    new MotionEvent.PointerProperties[]{p0, p1},
+                    new MotionEvent.PointerCoords[]{
+                        coords(centerX - halfSpan, centerY),
+                        coords(centerX + halfSpan, centerY)
+                    }
+                )
+            );
             SystemClock.sleep(24L);
         }
 
-        inject(instrumentation, event(
-            downTime, SystemClock.uptimeMillis(),
-            MotionEvent.ACTION_POINTER_UP | (1 << MotionEvent.ACTION_POINTER_INDEX_SHIFT),
-            new MotionEvent.PointerProperties[]{p0, p1},
-            new MotionEvent.PointerCoords[]{
-                coords(centerX - endHalfSpan, centerY),
-                coords(centerX + endHalfSpan, centerY)
-            }
-        ));
+        inject(
+            instrumentation,
+            event(
+                downTime,
+                SystemClock.uptimeMillis(),
+                MotionEvent.ACTION_POINTER_UP | (1 << MotionEvent.ACTION_POINTER_INDEX_SHIFT),
+                new MotionEvent.PointerProperties[]{p0, p1},
+                new MotionEvent.PointerCoords[]{
+                    coords(centerX - endHalfSpan, centerY),
+                    coords(centerX + endHalfSpan, centerY)
+                }
+            )
+        );
 
-        inject(instrumentation, event(
-            downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP,
-            new MotionEvent.PointerProperties[]{p0},
-            new MotionEvent.PointerCoords[]{coords(centerX - endHalfSpan, centerY)}
-        ));
+        inject(
+            instrumentation,
+            event(
+                downTime,
+                SystemClock.uptimeMillis(),
+                MotionEvent.ACTION_UP,
+                new MotionEvent.PointerProperties[]{p0},
+                new MotionEvent.PointerCoords[]{coords(centerX - endHalfSpan, centerY)}
+            )
+        );
     }
 
     private static MotionEvent.PointerProperties pointerProperties(int id) {
@@ -273,8 +335,11 @@ public class MainActivityTest {
         }
     }
 
-    private static void waitForJsBoolean(WebView webView, String expression, long timeoutMs)
-        throws Exception {
+    private static void waitForJsBoolean(
+        WebView webView,
+        String expression,
+        long timeoutMs
+    ) throws Exception {
         long deadline = SystemClock.elapsedRealtime() + timeoutMs;
         while (SystemClock.elapsedRealtime() < deadline) {
             if (evalJsBoolean(webView, expression)) {
@@ -291,16 +356,6 @@ public class MainActivityTest {
 
     private static int evalJsInt(WebView webView, String expression) throws Exception {
         return Integer.parseInt(evalJsRaw(webView, "Math.round(Number(" + expression + "))"));
-    }
-
-    private static String evalJsString(WebView webView, String expression) throws Exception {
-        String raw = evalJsRaw(webView, "String(" + expression + ")");
-        if (raw.length() >= 2 && raw.startsWith("\"") && raw.endsWith("\"")) {
-            return raw.substring(1, raw.length() - 1)
-                .replace("\\\"", "\"")
-                .replace("\\\\", "\\");
-        }
-        return raw;
     }
 
     private static String evalJsRaw(WebView webView, String expression) throws Exception {
