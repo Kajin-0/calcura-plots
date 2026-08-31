@@ -22,6 +22,7 @@
     "build": "npm run typecheck && npm run build:app && npm run build:lib",
     "build:app": "vite build",
     "build:lib": "vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json",
+    "prepare": "npm run build:lib",
     "verify:lib": "node scripts/verify-library-build.mjs",
     "typecheck": "tsc --noEmit",
     "test:public-api": "tsc -p tsconfig.consumer.json --noEmit",
