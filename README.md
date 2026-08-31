@@ -4,7 +4,7 @@ Standalone graphing lab and package-ready graph module for an eventual Calcura f
 
 ## Current phase: Phase 6
 
-The project now includes Capacitor/Android WebView certification in addition to the reusable package boundary established in Phase 5.
+The project includes Capacitor/Android WebView certification in addition to the reusable package boundary established in Phase 5.
 
 Stack:
 
@@ -18,7 +18,7 @@ Stack:
 - multiple simultaneous curves
 - package-ready ESM + declaration build
 - Playwright Chromium browser regressions
-- Capacitor 8 Android instrumentation on API 24 and API 36
+- Capacitor 8 Android instrumentation
 
 No Calcura source code is imported or modified.
 
@@ -70,23 +70,30 @@ INTERNET permission absent
 cleartext traffic disabled
 ```
 
-It builds one app APK + one instrumentation APK, then runs those exact binaries on:
+It builds one app APK + one instrumentation APK and reuses those exact binaries across the Android matrix.
+
+The matrix deliberately separates Android OS compatibility from JavaScript/WebView compatibility:
 
 ```text
-Android API 24
-Android API 36
+API 24  — minimum-SDK native Capacitor shell/install certification
+API 31  — full graph runtime/WebView certification
+API 36  — full graph runtime/WebView certification
 ```
 
-The instrumentation test uses the real Capacitor WebView and checks:
+Why the split: Calcura uses Vite 6's default production target, `modules`, which targets Chrome 87+ (plus the corresponding Firefox/Safari/Edge baselines). The stock AOSP WebView bundled in an API-24 emulator predates that target. Therefore `minSdk 24` is a native Android compatibility contract, not a promise that the untouched 2016 AOSP WebView can execute Calcura's current production bundle.
+
+On the full runtime endpoints, instrumentation uses the real Capacitor WebView and checks:
 
 - initial graph render
+- local `https://localhost` origin
 - multiple curves
 - semantic holes
 - native one-finger pan
 - native two-finger pinch
 - responsive orientation resize
 - lifecycle resume
-- local HTTPS origin
+
+Native gestures are injected as Android `MotionEvent` pointer sequences through `Instrumentation.sendPointerSync()`; they are not JavaScript wheel/mouse simulations.
 
 See `docs/PHASE6_ANDROID_CERTIFICATION.md`.
 
@@ -130,7 +137,7 @@ For Android generation/build on a machine with the Android SDK and Java installe
 npm run android:cert:prepare
 npm run android:cert:verify
 cd android
-./gradlew assembleDebug assembleAndroidTest
+./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
 ```
 
 GitHub Actions performs the emulator certification automatically.
