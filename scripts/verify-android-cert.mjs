@@ -48,12 +48,16 @@ const assertions = [
     'Generated Android app must retain the AndroidJUnitRunner.',
   ],
   [
-    /injectPinchOpen\(webView\)/.test(instrumentationTest),
-    'Instrumentation test must include real two-pointer pinch injection.',
+    /injectGraphPan\(webView\)/.test(instrumentationTest),
+    'Instrumentation test must include graph-targeted native Android touch pan.',
   ],
   [
-    /perform\(swipeLeft\(\)\)/.test(instrumentationTest),
-    'Instrumentation test must include real Android touch pan.',
+    /injectPinchOpen\(webView\)/.test(instrumentationTest),
+    'Instrumentation test must include graph-targeted two-pointer pinch injection.',
+  ],
+  [
+    /CALCURA_PLOTS_WEBVIEW_DIAGNOSTICS/.test(instrumentationTest),
+    'Instrumentation test must retain WebView compatibility diagnostics.',
   ],
 ]
 
@@ -74,5 +78,6 @@ console.log(
     internetPermission: false,
     nativePanTest: 'graph-targeted',
     nativePinchTest: 'graph-targeted-two-pointer',
+    webViewDiagnostics: true,
   }),
 )
