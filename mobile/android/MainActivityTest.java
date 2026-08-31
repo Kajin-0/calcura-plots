@@ -136,6 +136,19 @@ public class MainActivityTest {
                 JS_TIMEOUT_MS
             );
 
+            // Mobile layout can place the graph below the initial fold. Bring
+            // function-plot's actual D3 zoom surface into the app window before
+            // calculating native display coordinates.
+            evalJsRaw(
+                webView,
+                "(() => {" +
+                    "const node=document.querySelector('.zoom-and-drag');" +
+                    "node.scrollIntoView({block:'center',inline:'nearest'});" +
+                    "return true;" +
+                "})()"
+            );
+            SystemClock.sleep(300L);
+
             int beforePanHash = evalJsInt(webView, curveHashJs());
 
             // Genuine Android finger gesture targeted inside the graph viewport.
@@ -370,19 +383,19 @@ public class MainActivityTest {
     private static GraphScreenRect graphScreenRect(WebView webView) throws Exception {
         int cssLeft = evalJsInt(
             webView,
-            "document.querySelector('[data-testid=graph-host]').getBoundingClientRect().left"
+            "document.querySelector('.zoom-and-drag').getBoundingClientRect().left"
         );
         int cssTop = evalJsInt(
             webView,
-            "document.querySelector('[data-testid=graph-host]').getBoundingClientRect().top"
+            "document.querySelector('.zoom-and-drag').getBoundingClientRect().top"
         );
         int cssWidth = evalJsInt(
             webView,
-            "document.querySelector('[data-testid=graph-host]').getBoundingClientRect().width"
+            "document.querySelector('.zoom-and-drag').getBoundingClientRect().width"
         );
         int cssHeight = evalJsInt(
             webView,
-            "document.querySelector('[data-testid=graph-host]').getBoundingClientRect().height"
+            "document.querySelector('.zoom-and-drag').getBoundingClientRect().height"
         );
         int innerWidth = evalJsInt(webView, "window.innerWidth");
         int innerHeight = evalJsInt(webView, "window.innerHeight");

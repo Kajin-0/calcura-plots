@@ -4,7 +4,7 @@ Standalone graphing lab and package-ready graph module for an eventual Calcura f
 
 ## Current phase: Phase 6
 
-The project includes Capacitor/Android WebView certification in addition to the reusable package boundary established in Phase 5.
+The project includes Capacitor/Android certification in addition to the reusable package boundary established in Phase 5.
 
 Stack:
 
@@ -76,13 +76,12 @@ The matrix deliberately separates Android OS compatibility from JavaScript/WebVi
 
 ```text
 API 24  — minimum-SDK native Capacitor shell/install certification
-API 31  — full graph runtime/WebView certification
 API 36  — full graph runtime/WebView certification
 ```
 
-Why the split: Calcura uses Vite 6's default production target, `modules`, which targets Chrome 87+ (plus the corresponding Firefox/Safari/Edge baselines). The stock AOSP WebView bundled in an API-24 emulator predates that target. Therefore `minSdk 24` is a native Android compatibility contract, not a promise that the untouched 2016 AOSP WebView can execute Calcura's current production bundle.
+Why the split: Calcura uses Vite 6's default production target, `modules`, which targets Chrome 87+ (plus the corresponding Firefox/Safari/Edge baselines). The stock AOSP WebView bundled in old emulator images is outside that runtime target. Therefore `minSdk 24` is a native Android compatibility contract, not a promise that an untouched 2016 WebView can execute Calcura's current production bundle.
 
-On the full runtime endpoints, instrumentation uses the real Capacitor WebView and checks:
+On API 36, instrumentation uses the real Capacitor WebView and checks:
 
 - initial graph render
 - local `https://localhost` origin
@@ -93,7 +92,7 @@ On the full runtime endpoints, instrumentation uses the real Capacitor WebView a
 - responsive orientation resize
 - lifecycle resume
 
-Native gestures are injected as Android `MotionEvent` pointer sequences through `Instrumentation.sendPointerSync()`; they are not JavaScript wheel/mouse simulations.
+The native gesture test scrolls function-plot's real `.zoom-and-drag` surface into the mobile viewport, converts that DOM surface to Android display coordinates, and injects Android `MotionEvent` pointer sequences through `Instrumentation.sendPointerSync()`. It is not a JavaScript wheel/mouse simulation.
 
 See `docs/PHASE6_ANDROID_CERTIFICATION.md`.
 

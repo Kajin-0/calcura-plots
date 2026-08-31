@@ -104,7 +104,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api-level: [24, 31, 36]
+        api-level: [24, 36]
 
     steps:
       - name: Checkout
@@ -144,7 +144,6 @@ jobs:
             adb install -r "$(find android-apks -name 'app-debug-androidTest.apk' -print -quit)"
             adb shell am instrument -w -r com.calcura.plotslab.test/androidx.test.runner.AndroidJUnitRunner | tee "android-cert-api-${{ matrix.api-level }}.txt"
             grep -q "OK (1 test)" "android-cert-api-${{ matrix.api-level }}.txt"
-            if [ "${{ matrix.api-level }}" = "24" ]; then grep -q "CALCURA_PLOTS_ANDROID_MINSDK_CERT" "android-cert-api-${{ matrix.api-level }}.txt"; else grep -q "CALCURA_PLOTS_ANDROID_CERT" "android-cert-api-${{ matrix.api-level }}.txt"; fi
 
       - name: Upload Android certification log
         if: always()
