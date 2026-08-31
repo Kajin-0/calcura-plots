@@ -7,6 +7,8 @@ import {
 } from 'react'
 import functionPlot, {
   type Chart,
+  type FunctionPlotDatum,
+  type FunctionPlotDatumScope,
   type FunctionPlotOptions,
 } from 'function-plot'
 import {
@@ -32,6 +34,11 @@ interface FunctionGraphProps {
   height?: number
 }
 
+type EventedChart = Chart & {
+  on: (event: string, listener: () => void) => EventedChart
+  removeListener: (event: string, listener: () => void) => EventedChart
+}
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message
@@ -51,7 +58,7 @@ export default function FunctionGraph({
 }: FunctionGraphProps) {
   const hostRef = useRef<HTMLDivElement>(null)
   const optionsRef = useRef<FunctionPlotOptions | null>(null)
-  const chartRef = useRef<Chart | null>(null)
+  const chartRef = useRef<EventedChart | null>(null)
   const overlayListenerRef = useRef<(() => void) | null>(null)
   const compiledFunctionsRef = useRef<CompiledGraphFunction[]>([])
   const previousViewportKeyRef = useRef<string | null>(null)
@@ -131,19 +138,22 @@ export default function FunctionGraph({
       previousViewportKeyRef.current = nextViewportKey
     }
 
-    options.data = compilation.compiled.map((compiled) => ({
-      fn: ({ x }: { x: number }) => compiled.evaluate(Number(x)),
-      fnType: 'linear',
-      graphType: 'polyline',
-      sampler: 'builtIn',
-      range: compiled.definition.domain,
-      color: compiled.definition.color,
-    }))
+    options.data = compilation.compiled.map(
+      (compiled): FunctionPlotDatum => ({
+        fn: (scope: FunctionPlotDatumScope) =>
+          compiled.evaluate(Number(scope.x)),
+        fnType: 'linear',
+        graphType: 'polyline',
+        sampler: 'builtIn',
+        range: compiled.definition.domain,
+        color: compiled.definition.color,
+      }),
+    )
 
     optionsRef.current = options
 
     try {
-      const chart = functionPlot(options)
+      const chart = functionPlot(options) as EventedChart
 
       if (chartRef.current !== chart) {
         if (chartRef.current && overlayListenerRef.current) {
