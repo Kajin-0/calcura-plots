@@ -204,6 +204,12 @@ export default function FunctionGraph({
       if (chartRef.current && overlayListenerRef.current) {
         chartRef.current.removeListener('after:draw', overlayListenerRef.current)
       }
+
+      // React 18 StrictMode intentionally runs an effect cleanup/setup cycle in
+      // development. Clear both refs so the next setup knows the listener is
+      // detached and reattaches it to the cached function-plot Chart instance.
+      chartRef.current = null
+      overlayListenerRef.current = null
     }
   }, [])
 
