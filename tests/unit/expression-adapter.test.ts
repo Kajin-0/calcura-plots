@@ -39,6 +39,18 @@ test('enforces explicit graph domains', () => {
   assert.ok(Number.isNaN(compiled.evaluate(5)))
 })
 
+test('excluded domain endpoints are evaluator exclusions, not visual-only metadata', () => {
+  const compiled = compileGraphFunction({
+    id: 'open-log-endpoint',
+    expression: '1 / log(x)',
+    domainEndpoints: [{ x: 0, y: 0, included: false }],
+  })
+
+  assert.equal(Object.is(compiled.evaluateRaw(0), -0) || compiled.evaluateRaw(0) === 0, true)
+  assert.ok(Number.isNaN(compiled.evaluate(0)))
+  assert.ok(Number.isFinite(compiled.evaluate(0.5)))
+})
+
 test('accepts finite semantic domain endpoints', () => {
   const compiled = compileGraphFunction({
     id: 'sqrt',
