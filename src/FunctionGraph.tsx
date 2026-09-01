@@ -24,6 +24,7 @@ import type {
 } from './graph/types'
 
 export type {
+  GraphDomainEndpoint,
   GraphExclusion,
   GraphFunctionDefinition,
   PlotViewport,
