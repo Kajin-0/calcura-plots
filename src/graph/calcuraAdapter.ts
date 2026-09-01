@@ -32,7 +32,9 @@ export function createCalcuraGraphFunction(
     variable: input.variable,
     domain: input.domain ? [...input.domain] : undefined,
     exclusions: input.exclusions?.map((exclusion) => ({ ...exclusion })),
-    domainEndpoints: input.domainEndpoints?.map((endpoint) => ({ ...endpoint })),
+    ...(input.domainEndpoints
+      ? { domainEndpoints: input.domainEndpoints.map((endpoint) => ({ ...endpoint })) }
+      : {}),
     color: input.color,
   }
 }
