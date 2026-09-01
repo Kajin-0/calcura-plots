@@ -1,4 +1,5 @@
 import type {
+  GraphDomainEndpoint,
   GraphExclusion,
   GraphFunctionDefinition,
 } from './types'
@@ -13,6 +14,7 @@ export interface CalcuraGraphFunctionInput {
   variable?: string
   domain?: [number, number]
   exclusions?: GraphExclusion[]
+  domainEndpoints?: GraphDomainEndpoint[]
   color?: string
 }
 
@@ -30,6 +32,9 @@ export function createCalcuraGraphFunction(
     variable: input.variable,
     domain: input.domain ? [...input.domain] : undefined,
     exclusions: input.exclusions?.map((exclusion) => ({ ...exclusion })),
+    ...(input.domainEndpoints
+      ? { domainEndpoints: input.domainEndpoints.map((endpoint) => ({ ...endpoint })) }
+      : {}),
     color: input.color,
   }
 }

@@ -153,6 +153,25 @@ function validateDefinition(definition: GraphFunctionDefinition): string {
     }
   }
 
+
+  const seenDomainEndpoints = new Set<string>()
+  for (const endpoint of definition.domainEndpoints ?? []) {
+    if (!Number.isFinite(endpoint.x) || !Number.isFinite(endpoint.y)) {
+      throw new GraphExpressionError('Domain endpoint coordinates must be finite.')
+    }
+    if (typeof endpoint.included !== 'boolean') {
+      throw new GraphExpressionError('Domain endpoint inclusion must be boolean.')
+    }
+
+    const key = `${endpoint.x}|${endpoint.y}`
+    if (seenDomainEndpoints.has(key)) {
+      throw new GraphExpressionError(
+        `Duplicate domain endpoint: (${endpoint.x}, ${endpoint.y}).`,
+      )
+    }
+    seenDomainEndpoints.add(key)
+  }
+
   const seenExclusions = new Set<number>()
   for (const exclusion of definition.exclusions ?? []) {
     if (!Number.isFinite(exclusion.x)) {

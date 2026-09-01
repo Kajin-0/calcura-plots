@@ -25,22 +25,26 @@ test('Calcura adapter preserves serialized LaTeX and forces latex input format',
   })
 })
 
-test('Calcura adapter clones mutable domain and exclusion arrays', () => {
+test('Calcura adapter clones mutable domain, exclusion, and endpoint arrays', () => {
   const domain: [number, number] = [-2, 2]
   const exclusions = [{ x: 0, y: 1 }]
+  const domainEndpoints = [{ x: -2, y: 0, included: true }]
 
   const definition = createCalcuraGraphFunction({
     id: 'f',
     latex: 'x',
     domain,
     exclusions,
+    domainEndpoints,
   })
 
   domain[0] = -100
   exclusions[0].x = 99
+  domainEndpoints[0].x = 99
 
   assert.deepEqual(definition.domain, [-2, 2])
   assert.deepEqual(definition.exclusions, [{ x: 0, y: 1 }])
+  assert.deepEqual(definition.domainEndpoints, [{ x: -2, y: 0, included: true }])
 })
 
 test('multiple Calcura functions map to independent graph definitions', () => {

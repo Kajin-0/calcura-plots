@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test'
 const graphHost = '[data-testid="graph-host"]'
 const curvePath = `${graphHost} path.line.line-0`
 const semanticHole = `${graphHost} circle.calcura-semantic-hole`
+const domainEndpoint = `${graphHost} circle.calcura-domain-endpoint`
 
 async function selectPreset(page: Page, presetId: string) {
   await page.getByRole('combobox', { name: 'Plot preset' }).selectOption(presetId)
@@ -60,9 +61,15 @@ test('tan(x) still produces multiple disconnected curve segments', async ({ page
   expect(await curvePathCount(page)).toBeGreaterThanOrEqual(4)
 })
 
-test('sqrt(x) respects adapter-owned domain metadata', async ({ page }) => {
+test('sqrt(x) renders a closed finite domain endpoint', async ({ page }) => {
   await selectPreset(page, 'sqrt')
   expect(await curvePathCount(page)).toBeGreaterThanOrEqual(1)
+  const endpoint = page.locator(domainEndpoint)
+  await expect(endpoint).toHaveCount(1)
+  await expect(endpoint).toHaveAttribute('data-domain-endpoint-x', '0')
+  await expect(endpoint).toHaveAttribute('data-domain-endpoint-included', 'true')
+  const fill = await endpoint.evaluate((element) => getComputedStyle(element).fill)
+  expect(fill).not.toBe('none')
   await expect(page.locator('[role="alert"]')).toHaveCount(0)
 })
 

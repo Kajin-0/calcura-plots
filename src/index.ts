@@ -11,6 +11,7 @@ export type {
 } from './graph/calcuraAdapter'
 
 export type {
+  GraphDomainEndpoint,
   GraphExclusion,
   GraphFunctionDefinition,
   GraphInputFormat,

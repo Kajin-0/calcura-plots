@@ -5,6 +5,13 @@ export interface PlotViewport {
   y: [number, number]
 }
 
+export interface GraphDomainEndpoint {
+  x: number
+  y: number
+  /** True when the original function is defined at the endpoint. */
+  included: boolean
+}
+
 export interface GraphExclusion {
   x: number
   /**
@@ -31,6 +38,8 @@ export interface GraphFunctionDefinition {
   variable?: string
   domain?: [number, number]
   exclusions?: GraphExclusion[]
+  /** Finite semantic domain endpoints, distinct from removable holes. */
+  domainEndpoints?: GraphDomainEndpoint[]
   color?: string
 }
 

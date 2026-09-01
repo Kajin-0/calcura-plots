@@ -39,6 +39,18 @@ test('enforces explicit graph domains', () => {
   assert.ok(Number.isNaN(compiled.evaluate(5)))
 })
 
+test('accepts finite semantic domain endpoints', () => {
+  const compiled = compileGraphFunction({
+    id: 'sqrt',
+    expression: 'sqrt(x)',
+    domainEndpoints: [{ x: 0, y: 0, included: true }],
+  })
+
+  assert.deepEqual(compiled.definition.domainEndpoints, [
+    { x: 0, y: 0, included: true },
+  ])
+})
+
 test('enforces explicit excluded points and preserves semantic marker y', () => {
   const compiled = compileGraphFunction({
     id: 'f',
