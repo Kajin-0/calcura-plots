@@ -182,6 +182,30 @@ test('invalid viewport is rejected and recovery is deterministic', async ({ page
   await expect(page.locator(curvePath).first()).toBeVisible()
 })
 
+test('narrow host uses its measured width without minimum-width clipping', async ({ page }) => {
+  const host = page.locator(graphHost)
+  await host.evaluate((element) => {
+    const parent = element.parentElement
+    if (parent) {
+      parent.style.width = '280px'
+    }
+  })
+
+  const hostBox = await host.boundingBox()
+  expect(hostBox).not.toBeNull()
+
+  await expect
+    .poll(async () =>
+      Number(await page.locator(`${graphHost} svg.function-plot`).getAttribute('width')),
+    )
+    .toBe(Math.floor(hostBox!.width))
+
+  const svgBox = await page.locator(`${graphHost} svg.function-plot`).boundingBox()
+  expect(svgBox).not.toBeNull()
+  expect(svgBox!.x).toBeGreaterThanOrEqual(hostBox!.x - 1)
+  expect(svgBox!.x + svgBox!.width).toBeLessThanOrEqual(hostBox!.x + hostBox!.width + 1)
+})
+
 test('responsive resize rebuilds the SVG to the new host width', async ({ page }) => {
   await page.setViewportSize({ width: 1180, height: 900 })
   const wideWidth = Number(
