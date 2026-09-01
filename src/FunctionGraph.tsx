@@ -37,9 +37,28 @@ export interface FunctionGraphProps {
   className?: string
 }
 
+type SelectedTipPoint = {
+  x: number
+  y: number
+  index: number
+}
+
+type PlotTip = {
+  move: (coordinates: { x: number; y: number }) => void
+  hide: () => void
+}
+
 type EventedChart = Chart & {
-  on: (event: string, listener: () => void) => EventedChart
-  removeListener: (event: string, listener: () => void) => EventedChart
+  on: (
+    event: string,
+    listener: (...args: any[]) => void,
+  ) => EventedChart
+  removeListener: (
+    event: string,
+    listener: (...args: any[]) => void,
+  ) => EventedChart
+  removeAllListeners: (event?: string) => EventedChart
+  tip: PlotTip
 }
 
 function getErrorMessage(error: unknown): string {
@@ -54,6 +73,10 @@ function viewportKey(viewport: PlotViewport): string {
   return [...viewport.x, ...viewport.y].join('|')
 }
 
+function functionSetKey(functions: GraphFunctionDefinition[]): string {
+  return JSON.stringify(functions)
+}
+
 export default function FunctionGraph({
   functions,
   viewport,
@@ -64,8 +87,15 @@ export default function FunctionGraph({
   const optionsRef = useRef<FunctionPlotOptions | null>(null)
   const chartRef = useRef<EventedChart | null>(null)
   const overlayListenerRef = useRef<(() => void) | null>(null)
+  const tipUpdateListenerRef = useRef<
+    ((selection: SelectedTipPoint) => void) | null
+  >(null)
+  const clickSurfaceRef = useRef<SVGRectElement | null>(null)
+  const clickListenerRef = useRef<((event: MouseEvent) => void) | null>(null)
+  const selectedTipRef = useRef<SelectedTipPoint | null>(null)
   const compiledFunctionsRef = useRef<CompiledGraphFunction[]>([])
   const previousViewportKeyRef = useRef<string | null>(null)
+  const previousFunctionSetKeyRef = useRef<string | null>(null)
   const [renderError, setRenderError] = useState<string | null>(null)
 
   const compilation = useMemo(() => {
@@ -85,6 +115,11 @@ export default function FunctionGraph({
     }
   }, [functions])
 
+  const currentFunctionSetKey = useMemo(
+    () => functionSetKey(functions),
+    [functions],
+  )
+
   compiledFunctionsRef.current = compilation.compiled
 
   const draw = useCallback(() => {
@@ -93,7 +128,18 @@ export default function FunctionGraph({
       return
     }
 
+    const functionSetChanged =
+      previousFunctionSetKeyRef.current !== null &&
+      previousFunctionSetKeyRef.current !== currentFunctionSetKey
+
+    if (functionSetChanged) {
+      selectedTipRef.current = null
+      chartRef.current?.tip.hide()
+    }
+    previousFunctionSetKeyRef.current = currentFunctionSetKey
+
     if (compilation.error) {
+      selectedTipRef.current = null
       host.replaceChildren()
       setRenderError(compilation.error)
       return
@@ -103,6 +149,7 @@ export default function FunctionGraph({
     const [yMin, yMax] = viewport.y
 
     if (!(xMin < xMax) || !(yMin < yMax)) {
+      selectedTipRef.current = null
       setRenderError('Viewport minimums must be smaller than maximums.')
       host.replaceChildren()
       return
@@ -163,26 +210,108 @@ export default function FunctionGraph({
         if (chartRef.current && overlayListenerRef.current) {
           chartRef.current.removeListener('after:draw', overlayListenerRef.current)
         }
+        if (chartRef.current && tipUpdateListenerRef.current) {
+          chartRef.current.removeListener('tip:update', tipUpdateListenerRef.current)
+        }
+        if (clickSurfaceRef.current && clickListenerRef.current) {
+          clickSurfaceRef.current.removeEventListener('click', clickListenerRef.current)
+        }
+
+        // function-plot's default tip is a hover probe. Its zoom handler also
+        // emits a synthetic mousemove after every pan/zoom, which changes the
+        // displayed point while the user is dragging. Calcura uses explicit
+        // selection semantics instead: only a click/tap may choose a point.
+        chart.removeAllListeners('mousemove')
+        chart.removeAllListeners('mouseover')
+        chart.removeAllListeners('mouseout')
+
+        const tipUpdateListener = (selection: SelectedTipPoint) => {
+          selectedTipRef.current = selection
+
+          const tipNode = hostRef.current?.querySelector<SVGGElement>('g.inner-tip')
+          if (tipNode) {
+            tipNode.setAttribute('data-selected-x', String(selection.x))
+            tipNode.setAttribute('data-selected-y', String(selection.y))
+            tipNode.setAttribute('data-selected-index', String(selection.index))
+          }
+        }
 
         const listener = () => {
           const currentHost = hostRef.current
           if (currentHost) {
             renderSemanticOverlays(currentHost, chart, compiledFunctionsRef.current)
           }
+
+          const selected = selectedTipRef.current
+          if (selected) {
+            chart.tip.move({ x: selected.x, y: selected.y })
+          }
         }
 
+        chart.on('tip:update', tipUpdateListener)
         chart.on('after:draw', listener)
         chartRef.current = chart
+        tipUpdateListenerRef.current = tipUpdateListener
         overlayListenerRef.current = listener
       }
 
+      const clickSurface = host.querySelector<SVGRectElement>('.zoom-and-drag')
+      if (clickSurfaceRef.current !== clickSurface) {
+        if (clickSurfaceRef.current && clickListenerRef.current) {
+          clickSurfaceRef.current.removeEventListener('click', clickListenerRef.current)
+        }
+
+        clickSurfaceRef.current = clickSurface
+        clickListenerRef.current = null
+
+        if (clickSurface) {
+          const clickListener = (event: MouseEvent) => {
+            if (event.button !== 0) {
+              return
+            }
+
+            const xScale = chart.meta.xScale
+            const yScale = chart.meta.yScale
+            if (!xScale || !yScale) {
+              return
+            }
+
+            const bounds = clickSurface.getBoundingClientRect()
+            if (bounds.width <= 0 || bounds.height <= 0) {
+              return
+            }
+
+            const localX = event.clientX - bounds.left
+            const localY = event.clientY - bounds.top
+
+            selectedTipRef.current = null
+            chart.tip.move({
+              x: xScale.invert(localX),
+              y: yScale.invert(localY),
+            })
+          }
+
+          clickSurface.addEventListener('click', clickListener)
+          clickListenerRef.current = clickListener
+        }
+      }
+
       renderSemanticOverlays(host, chart, compilation.compiled)
+
+      const selected = selectedTipRef.current
+      if (selected) {
+        chart.tip.move({ x: selected.x, y: selected.y })
+      } else {
+        chart.tip.hide()
+      }
+
       setRenderError(null)
     } catch (error) {
+      selectedTipRef.current = null
       host.replaceChildren()
       setRenderError(getErrorMessage(error))
     }
-  }, [compilation, height, viewport])
+  }, [compilation, currentFunctionSetKey, height, viewport])
 
   useLayoutEffect(() => {
     const host = hostRef.current
@@ -208,12 +337,22 @@ export default function FunctionGraph({
       if (chartRef.current && overlayListenerRef.current) {
         chartRef.current.removeListener('after:draw', overlayListenerRef.current)
       }
+      if (chartRef.current && tipUpdateListenerRef.current) {
+        chartRef.current.removeListener('tip:update', tipUpdateListenerRef.current)
+      }
+      if (clickSurfaceRef.current && clickListenerRef.current) {
+        clickSurfaceRef.current.removeEventListener('click', clickListenerRef.current)
+      }
 
       // React 18 StrictMode intentionally runs an effect cleanup/setup cycle in
-      // development. Clear both refs so the next setup knows the listener is
-      // detached and reattaches it to the cached function-plot Chart instance.
+      // development. Clear refs so the next setup knows the listeners are
+      // detached and reattaches them to the cached function-plot Chart instance.
       chartRef.current = null
       overlayListenerRef.current = null
+      tipUpdateListenerRef.current = null
+      clickSurfaceRef.current = null
+      clickListenerRef.current = null
+      selectedTipRef.current = null
     }
   }, [])
 
