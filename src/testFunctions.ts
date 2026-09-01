@@ -79,6 +79,7 @@ export const PLOT_PRESETS: PlotPreset[] = [
     label: 'Restricted domain — sqrt(x)',
     functionDefinitions: one('\\sqrt{x}', {
       domain: [0, 12],
+      domainEndpoints: [{ x: 0, y: 0, included: true }],
     }),
     xDomain: [-5, 12],
     yDomain: [-2, 5],
