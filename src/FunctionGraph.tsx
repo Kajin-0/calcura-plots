@@ -155,7 +155,10 @@ export default function FunctionGraph({
       return
     }
 
-    const width = Math.max(320, Math.floor(host.getBoundingClientRect().width))
+    const width = Math.floor(host.getBoundingClientRect().width)
+    if (width <= 0) {
+      return
+    }
     const nextViewportKey = viewportKey(viewport)
     const viewportChanged = previousViewportKeyRef.current !== nextViewportKey
 
@@ -365,10 +368,11 @@ export default function FunctionGraph({
     : 'calcura-function-graph'
 
   return (
-    <div className={shellClassName}>
+    <div className={shellClassName} style={{ minHeight: height }}>
       <div
         ref={hostRef}
         className="graph-host"
+        style={{ minHeight: height }}
         data-testid="graph-host"
         role="img"
         aria-label={'Graph of ' + accessibleExpression}
