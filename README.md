@@ -10,6 +10,7 @@ Stack:
 
 - Vite + React + TypeScript
 - `function-plot@1.25.4` for sampling/rendering/pan/zoom
+- Calcura-owned click/tap point selection that stays logically pinned during pan/zoom
 - `mathjs@12.4.0` for Calcura-aligned parsing and numeric compilation
 - Calcura-style LaTeX input normalization
 - strict graph-expression AST whitelist
@@ -87,8 +88,9 @@ On API 36, instrumentation uses the real Capacitor WebView and checks:
 - local `https://localhost` origin
 - multiple curves
 - semantic holes
-- native one-finger pan
-- native two-finger pinch
+- native tap point selection
+- selected-point persistence through native one-finger pan
+- selected-point persistence through native two-finger pinch
 - responsive orientation resize
 - lifecycle resume
 
