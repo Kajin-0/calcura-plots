@@ -149,6 +149,28 @@ public class MainActivityTest {
             );
             SystemClock.sleep(300L);
 
+            // A genuine single-finger tap selects a logical graph point.
+            injectGraphTap(webView);
+            waitForJsBoolean(
+                webView,
+                "document.querySelector('.inner-tip') !== null && " +
+                    "getComputedStyle(document.querySelector('.inner-tip')).display !== 'none'",
+                JS_TIMEOUT_MS
+            );
+
+            String selectedTipTextBeforePan = evalJsRaw(
+                webView,
+                "(document.querySelector('.inner-tip text')?.textContent || '')"
+            );
+            String selectedTipXBeforePan = evalJsRaw(
+                webView,
+                "(document.querySelector('.inner-tip')?.getAttribute('data-selected-x') || '')"
+            );
+            String selectedTipTransformBeforePan = evalJsRaw(
+                webView,
+                "(document.querySelector('.inner-tip')?.getAttribute('transform') || '')"
+            );
+
             int beforePanHash = evalJsInt(webView, curveHashJs());
 
             // Genuine Android finger gesture targeted inside the graph viewport.
@@ -162,6 +184,33 @@ public class MainActivityTest {
                 afterPanHash
             );
 
+            String selectedTipTextAfterPan = evalJsRaw(
+                webView,
+                "(document.querySelector('.inner-tip text')?.textContent || '')"
+            );
+            String selectedTipXAfterPan = evalJsRaw(
+                webView,
+                "(document.querySelector('.inner-tip')?.getAttribute('data-selected-x') || '')"
+            );
+            String selectedTipTransformAfterPan = evalJsRaw(
+                webView,
+                "(document.querySelector('.inner-tip')?.getAttribute('transform') || '')"
+            );
+
+            assertTrue(
+                "Android pan must preserve selected point text",
+                selectedTipTextBeforePan.equals(selectedTipTextAfterPan)
+            );
+            assertTrue(
+                "Android pan must preserve selected logical x",
+                selectedTipXBeforePan.equals(selectedTipXAfterPan)
+            );
+            assertNotEquals(
+                "Pinned selected point should move on screen with the panned viewport",
+                selectedTipTransformBeforePan,
+                selectedTipTransformAfterPan
+            );
+
             int beforePinchHash = afterPanHash;
             injectPinchOpen(webView);
             SystemClock.sleep(550L);
@@ -171,6 +220,15 @@ public class MainActivityTest {
                 "Android two-finger pinch must change rendered curve geometry",
                 beforePinchHash,
                 afterPinchHash
+            );
+            assertTrue(
+                "Android pinch must preserve selected logical x",
+                selectedTipXBeforePan.equals(
+                    evalJsRaw(
+                        webView,
+                        "(document.querySelector('.inner-tip')?.getAttribute('data-selected-x') || '')"
+                    )
+                )
             );
             assertTrue(
                 "Semantic hole must survive native pan/pinch redraws",
@@ -234,7 +292,7 @@ public class MainActivityTest {
                 ",readyMs=" + readyMs +
                 ",portraitWidth=" + portraitInnerWidth +
                 ",landscapeWidth=" + landscapeInnerWidth +
-                ",pan=true,pinch=true,multiCurve=true,semanticHole=true,lifecycle=true}"
+                ",pan=true,pinch=true,pointSelectionPinned=true,multiCurve=true,semanticHole=true,lifecycle=true}"
             );
         }
     }
@@ -247,6 +305,39 @@ public class MainActivityTest {
             "for(let i=0;i<s.length;i++){h=((h<<5)-h+s.charCodeAt(i))|0;}" +
             "return h;" +
         "})()";
+    }
+
+    private static void injectGraphTap(WebView webView) throws Exception {
+        GraphScreenRect graph = graphScreenRect(webView);
+
+        float x = graph.left + graph.width * 0.50f;
+        float y = graph.top + graph.height * 0.50f;
+        long downTime = SystemClock.uptimeMillis();
+        MotionEvent.PointerProperties pointer = pointerProperties(0);
+
+        injectToDisplay(
+            webView,
+            event(
+                downTime,
+                downTime,
+                MotionEvent.ACTION_DOWN,
+                new MotionEvent.PointerProperties[]{pointer},
+                new MotionEvent.PointerCoords[]{coords(x, y)}
+            )
+        );
+
+        SystemClock.sleep(70L);
+
+        injectToDisplay(
+            webView,
+            event(
+                downTime,
+                SystemClock.uptimeMillis(),
+                MotionEvent.ACTION_UP,
+                new MotionEvent.PointerProperties[]{pointer},
+                new MotionEvent.PointerCoords[]{coords(x, y)}
+            )
+        );
     }
 
     private static void injectGraphPan(WebView webView) throws Exception {
