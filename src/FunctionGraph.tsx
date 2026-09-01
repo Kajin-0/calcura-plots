@@ -155,10 +155,15 @@ export default function FunctionGraph({
       return
     }
 
-    const width = Math.floor(host.getBoundingClientRect().width)
-    if (width <= 0) {
+    const hostWidth = Math.floor(host.getBoundingClientRect().width)
+    if (hostWidth <= 0) {
       return
     }
+
+    // function-plot 1.25.4 hard-codes 40px left / 20px right internal margins.
+    // Render the SVG 20px narrower so the Cartesian plot rectangle sits with
+    // equal 40px visual space on both sides of the host.
+    const width = Math.max(1, hostWidth - 20)
     const nextViewportKey = viewportKey(viewport)
     const viewportChanged = previousViewportKeyRef.current !== nextViewportKey
 
