@@ -30,13 +30,15 @@ export function renderSemanticOverlays(
   overlay.setAttribute('pointer-events', 'none')
 
   functions.forEach((compiled, functionIndex) => {
-    compiled.resolvedExclusions.forEach((exclusion) => {
-      if (exclusion.y === undefined) {
-        return
-      }
-
-      const cx = xScale(exclusion.x)
-      const cy = yScale(exclusion.y)
+    const appendCircle = (
+      className: string,
+      x: number,
+      y: number,
+      fill: string,
+      dataAttributes: Record<string, string>,
+    ) => {
+      const cx = xScale(x)
+      const cy = yScale(y)
 
       if (
         !Number.isFinite(cx) ||
@@ -50,17 +52,49 @@ export function renderSemanticOverlays(
       }
 
       const circle = document.createElementNS(SVG_NS, 'circle')
-      circle.setAttribute('class', 'calcura-semantic-hole')
+      circle.setAttribute('class', className)
       circle.setAttribute('data-function-id', compiled.definition.id)
       circle.setAttribute('data-function-index', String(functionIndex))
-      circle.setAttribute('data-exclusion-x', String(exclusion.x))
+      Object.entries(dataAttributes).forEach(([name, value]) => {
+        circle.setAttribute(name, value)
+      })
       circle.setAttribute('cx', String(cx))
       circle.setAttribute('cy', String(cy))
       circle.setAttribute('r', '5')
       circle.setAttribute('stroke', compiled.definition.color ?? '#6f5ee8')
       circle.setAttribute('stroke-width', '2.5')
+      circle.setAttribute('fill', fill)
       overlay.appendChild(circle)
+    }
+
+    compiled.resolvedExclusions.forEach((exclusion) => {
+      if (exclusion.y === undefined) {
+        return
+      }
+
+      appendCircle(
+        'calcura-semantic-hole',
+        exclusion.x,
+        exclusion.y,
+        'transparent',
+        { 'data-exclusion-x': String(exclusion.x) },
+      )
     })
+
+    for (const endpoint of compiled.definition.domainEndpoints ?? []) {
+      appendCircle(
+        endpoint.included
+          ? 'calcura-domain-endpoint calcura-domain-endpoint-included'
+          : 'calcura-domain-endpoint calcura-domain-endpoint-excluded',
+        endpoint.x,
+        endpoint.y,
+        endpoint.included ? (compiled.definition.color ?? '#6f5ee8') : 'transparent',
+        {
+          'data-domain-endpoint-x': String(endpoint.x),
+          'data-domain-endpoint-included': String(endpoint.included),
+        },
+      )
+    }
   })
 
   canvas.appendChild(overlay)
