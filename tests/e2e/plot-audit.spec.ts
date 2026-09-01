@@ -182,7 +182,7 @@ test('invalid viewport is rejected and recovery is deterministic', async ({ page
   await expect(page.locator(curvePath).first()).toBeVisible()
 })
 
-test('narrow host uses its measured width without minimum-width clipping', async ({ page }) => {
+test('narrow host keeps the Cartesian plot rectangle horizontally centered', async ({ page }) => {
   const host = page.locator(graphHost)
   await host.evaluate((element) => {
     const parent = element.parentElement
@@ -191,19 +191,18 @@ test('narrow host uses its measured width without minimum-width clipping', async
     }
   })
 
+  const surface = page.locator(`${graphHost} .zoom-and-drag`)
   const hostBox = await host.boundingBox()
+  const surfaceBox = await surface.boundingBox()
   expect(hostBox).not.toBeNull()
+  expect(surfaceBox).not.toBeNull()
 
-  await expect
-    .poll(async () =>
-      Number(await page.locator(`${graphHost} svg.function-plot`).getAttribute('width')),
-    )
-    .toBe(Math.floor(hostBox!.width))
+  const leftGap = surfaceBox!.x - hostBox!.x
+  const rightGap = hostBox!.x + hostBox!.width - (surfaceBox!.x + surfaceBox!.width)
 
-  const svgBox = await page.locator(`${graphHost} svg.function-plot`).boundingBox()
-  expect(svgBox).not.toBeNull()
-  expect(svgBox!.x).toBeGreaterThanOrEqual(hostBox!.x - 1)
-  expect(svgBox!.x + svgBox!.width).toBeLessThanOrEqual(hostBox!.x + hostBox!.width + 1)
+  expect(Math.abs(leftGap - rightGap)).toBeLessThanOrEqual(1)
+  expect(surfaceBox!.x).toBeGreaterThanOrEqual(hostBox!.x)
+  expect(surfaceBox!.x + surfaceBox!.width).toBeLessThanOrEqual(hostBox!.x + hostBox!.width)
 })
 
 test('responsive resize rebuilds the SVG to the new host width', async ({ page }) => {
