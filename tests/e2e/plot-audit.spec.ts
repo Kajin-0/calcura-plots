@@ -211,6 +211,58 @@ test('wheel zoom changes rendered curve geometry without resetting on draw', asy
   await expect.poll(() => firstCurveD(page)).not.toBe(before)
 })
 
+test('selected point changes only on click and stays logically pinned during pan', async ({
+  page,
+}) => {
+  await selectPreset(page, 'sine')
+
+  const surface = page.locator(`${graphHost} .zoom-and-drag`)
+  const tip = page.locator(`${graphHost} g.inner-tip`)
+  const tipText = tip.locator('text')
+  const box = await surface.boundingBox()
+  expect(box).not.toBeNull()
+
+  const firstX = box!.x + box!.width * 0.5
+  const firstY = box!.y + box!.height * 0.5
+
+  // Pointer movement alone must not create or move a selection.
+  await page.mouse.move(firstX, firstY)
+  await expect(tip).toBeHidden()
+
+  // A single click selects the nearest point.
+  await page.mouse.click(firstX, firstY)
+  await expect(tip).toBeVisible()
+
+  const selectedX = await tip.getAttribute('data-selected-x')
+  const selectedText = await tipText.textContent()
+  const selectedTransform = await tip.getAttribute('transform')
+  expect(selectedX).not.toBeNull()
+  expect(selectedText).not.toBeNull()
+  expect(selectedTransform).not.toBeNull()
+
+  const beforeCurve = await firstCurveD(page)
+
+  // Panning must move the viewport, but not change the selected logical point.
+  await page.mouse.move(box!.x + box!.width * 0.45, firstY)
+  await page.mouse.down()
+  await page.mouse.move(box!.x + box!.width * 0.65, firstY, { steps: 8 })
+  await page.mouse.up()
+
+  await expect.poll(() => firstCurveD(page)).not.toBe(beforeCurve)
+  await expect.poll(() => tip.getAttribute('data-selected-x')).toBe(selectedX)
+  await expect.poll(() => tipText.textContent()).toBe(selectedText)
+  await expect.poll(() => tip.getAttribute('transform')).not.toBe(selectedTransform)
+
+  // A new single click is the only interaction that replaces the selection.
+  const updatedBox = await surface.boundingBox()
+  expect(updatedBox).not.toBeNull()
+  await page.mouse.click(
+    updatedBox!.x + updatedBox!.width * 0.72,
+    updatedBox!.y + updatedBox!.height * 0.5,
+  )
+  await expect.poll(() => tip.getAttribute('data-selected-x')).not.toBe(selectedX)
+})
+
 test('drag pan changes rendered curve geometry', async ({ page }) => {
   await selectPreset(page, 'sine')
   const before = await firstCurveD(page)
