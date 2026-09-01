@@ -76,7 +76,7 @@ export function renderSemanticOverlays(
         'calcura-semantic-hole',
         exclusion.x,
         exclusion.y,
-        'transparent',
+        'var(--calcura-plot-background)',
         { 'data-exclusion-x': String(exclusion.x) },
       )
     })
@@ -88,7 +88,9 @@ export function renderSemanticOverlays(
           : 'calcura-domain-endpoint calcura-domain-endpoint-excluded',
         endpoint.x,
         endpoint.y,
-        endpoint.included ? (compiled.definition.color ?? '#6f5ee8') : 'transparent',
+        endpoint.included
+          ? (compiled.definition.color ?? '#6f5ee8')
+          : 'var(--calcura-plot-background)',
         {
           'data-domain-endpoint-x': String(endpoint.x),
           'data-domain-endpoint-included': String(endpoint.included),
