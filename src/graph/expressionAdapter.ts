@@ -234,6 +234,9 @@ export function compileGraphFunction(
 
   const compiled = root.compile()
   const exclusions = definition.exclusions ?? []
+  const excludedDomainEndpoints = (definition.domainEndpoints ?? []).filter(
+    (endpoint) => !endpoint.included,
+  )
 
   const evaluateRaw = (x: number): number => {
     if (!Number.isFinite(x)) {
@@ -260,6 +263,10 @@ export function compileGraphFunction(
     }
 
     if (isExcluded(x, exclusions)) {
+      return Number.NaN
+    }
+
+    if (excludedDomainEndpoints.some((endpoint) => x === endpoint.x)) {
       return Number.NaN
     }
 
