@@ -16,6 +16,10 @@ import {
   compileGraphFunctions,
   GraphExpressionError,
 } from './graph/expressionAdapter'
+import {
+  clipGraphSampleToYDomain,
+  resolvePlotYDomain,
+} from './graph/sampleClip'
 import { renderSemanticOverlays } from './graph/semanticOverlay'
 import type {
   CompiledGraphFunction,
@@ -199,8 +203,14 @@ export default function FunctionGraph({
 
     options.data = compilation.compiled.map(
       (compiled): FunctionPlotDatum => ({
-        fn: (scope: FunctionPlotDatumScope) =>
-          compiled.evaluate(Number(scope.x)),
+        fn: (scope: FunctionPlotDatumScope) => {
+          const y = compiled.evaluate(Number(scope.x))
+          const yDomain = resolvePlotYDomain(
+            chartRef.current?.meta.yScale?.domain(),
+            [yMin, yMax],
+          )
+          return clipGraphSampleToYDomain(y, yDomain[0], yDomain[1])
+        },
         fnType: 'linear',
         graphType: 'polyline',
         sampler: 'builtIn',

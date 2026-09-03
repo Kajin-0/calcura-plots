@@ -75,6 +75,13 @@ export const PLOT_PRESETS: PlotPreset[] = [
     yDomain: [-10, 10],
   },
   {
+    id: 'inverse-sqrt-circle',
+    label: 'Domain-edge poles — -1 / sqrt(9 - x²)',
+    functionDefinitions: one('-\\frac{1}{\\sqrt{9-x^2}}'),
+    xDomain: [-10, 10],
+    yDomain: [-10, 10],
+  },
+  {
     id: 'sqrt',
     label: 'Restricted domain — sqrt(x)',
     functionDefinitions: one('\\sqrt{x}', {

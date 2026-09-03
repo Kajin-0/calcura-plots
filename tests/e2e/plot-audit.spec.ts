@@ -19,6 +19,26 @@ async function firstCurveD(page: Page) {
   return page.locator(curvePath).first().getAttribute('d')
 }
 
+async function assertCurvePixelsStayInHost(page: Page) {
+  const svg = page.locator(`${graphHost} svg.function-plot`)
+  const svgBox = await svg.boundingBox()
+  expect(svgBox).not.toBeNull()
+
+  const maxCoord = Math.max(svgBox!.width, svgBox!.height) * 20
+  const paths = await page.locator(curvePath).evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute('d') ?? ''),
+  )
+
+  expect(paths.some((d) => d.length > 0)).toBe(true)
+
+  for (const d of paths) {
+    const numbers = d.match(/-?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/gi) ?? []
+    for (const raw of numbers) {
+      expect(Math.abs(Number(raw))).toBeLessThan(maxCoord)
+    }
+  }
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Calcura Plots' })).toBeVisible()
@@ -59,6 +79,15 @@ test('shifted reciprocal remains split across x = 2', async ({ page }) => {
 test('tan(x) still produces multiple disconnected curve segments', async ({ page }) => {
   await selectPreset(page, 'tangent')
   expect(await curvePathCount(page)).toBeGreaterThanOrEqual(4)
+})
+
+test('domain-edge poles do not emit huge SVG path coordinates', async ({ page }) => {
+  await selectPreset(page, 'inverse-sqrt-circle')
+  await page.getByRole('spinbutton', { name: 'y min' }).fill('-1')
+  await page.getByRole('spinbutton', { name: 'y max' }).fill('0')
+  await expect(page.locator(curvePath).first()).toBeVisible()
+  await expect(page.locator('[role="alert"]')).toHaveCount(0)
+  await assertCurvePixelsStayInHost(page)
 })
 
 test('sqrt(x) renders a closed finite domain endpoint', async ({ page }) => {
