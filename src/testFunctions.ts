@@ -40,6 +40,13 @@ export const PLOT_PRESETS: PlotPreset[] = [
     yDomain: [-10, 10],
   },
   {
+    id: 'steep-odd-power',
+    label: 'Steep finite odd power — 2x(x²+6)⁴',
+    functionDefinitions: one('2x(x^2+6)^4'),
+    xDomain: [-10, 10],
+    yDomain: [-10, 10],
+  },
+  {
     id: 'sine',
     label: 'Sine — sin(x)',
     functionDefinitions: one('\\sin(x)'),

@@ -17,7 +17,10 @@ import {
   GraphExpressionError,
 } from './graph/expressionAdapter'
 import {
+  clampGraphSampleToYDomain,
   clipGraphSampleToYDomain,
+  graphDropClipKeepsUniformSample,
+  resolvePlotAxisDomain,
   resolvePlotYDomain,
 } from './graph/sampleClip'
 import { renderSemanticOverlays } from './graph/semanticOverlay'
@@ -160,7 +163,9 @@ export default function FunctionGraph({
     }
 
     const hostWidth = Math.floor(host.getBoundingClientRect().width)
-    if (hostWidth <= 0) {
+    // function-plot subtracts 40+20px axis margins. A too-narrow host yields a
+    // non-positive inner width and an empty polyline that throws on d[0].
+    if (hostWidth < 80) {
       return
     }
 
@@ -201,22 +206,43 @@ export default function FunctionGraph({
       previousViewportKeyRef.current = nextViewportKey
     }
 
+    const liveYDomain = resolvePlotYDomain(
+      chartRef.current?.meta.yScale?.domain(),
+      [yMin, yMax],
+    )
+    const [clipYMin, clipYMax] = liveYDomain
+    const [sampleXMin, sampleXMax] = viewportChanged
+      ? [xMin, xMax]
+      : resolvePlotAxisDomain(chartRef.current?.meta.xScale?.domain(), [xMin, xMax])
+
     options.data = compilation.compiled.map(
-      (compiled): FunctionPlotDatum => ({
-        fn: (scope: FunctionPlotDatumScope) => {
-          const y = compiled.evaluate(Number(scope.x))
-          const yDomain = resolvePlotYDomain(
-            chartRef.current?.meta.yScale?.domain(),
-            [yMin, yMax],
-          )
-          return clipGraphSampleToYDomain(y, yDomain[0], yDomain[1])
-        },
-        fnType: 'linear',
-        graphType: 'polyline',
-        sampler: 'builtIn',
-        range: compiled.definition.domain,
-        color: compiled.definition.color,
-      }),
+      (compiled): FunctionPlotDatum => {
+        const dropClipKeepsSamples = graphDropClipKeepsUniformSample(
+          compiled.evaluate,
+          sampleXMin,
+          sampleXMax,
+          clipYMin,
+          clipYMax,
+        )
+
+        return {
+          fn: (scope: FunctionPlotDatumScope) => {
+            const y = compiled.evaluate(Number(scope.x))
+            const yDomain = resolvePlotYDomain(
+              chartRef.current?.meta.yScale?.domain(),
+              [yMin, yMax],
+            )
+            return dropClipKeepsSamples
+              ? clipGraphSampleToYDomain(y, yDomain[0], yDomain[1])
+              : clampGraphSampleToYDomain(y, yDomain[0], yDomain[1])
+          },
+          fnType: 'linear',
+          graphType: 'polyline',
+          sampler: 'builtIn',
+          range: compiled.definition.domain,
+          color: compiled.definition.color,
+        }
+      },
     )
 
     optionsRef.current = options
@@ -326,6 +352,8 @@ export default function FunctionGraph({
       setRenderError(null)
     } catch (error) {
       selectedTipRef.current = null
+      optionsRef.current = null
+      chartRef.current = null
       host.replaceChildren()
       setRenderError(getErrorMessage(error))
     }

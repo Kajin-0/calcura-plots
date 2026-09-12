@@ -45,6 +45,14 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator(curvePath).first()).toBeVisible()
 })
 
+test('steep finite odd-power curves still draw without a plot error', async ({
+  page,
+}) => {
+  await selectPreset(page, 'steep-odd-power')
+  expect(await curvePathCount(page)).toBeGreaterThanOrEqual(1)
+  await assertCurvePixelsStayInHost(page)
+})
+
 test('smooth Calcura LaTeX functions render through the owned evaluator', async ({
   page,
 }) => {
