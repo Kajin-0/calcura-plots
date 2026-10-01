@@ -3,5 +3,7 @@ dist
 dist-lib
 android
 .vite
+test-results/
+playwright-report/
 .DS_Store
 *.local
