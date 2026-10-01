@@ -115,3 +115,94 @@ export function graphDropClipKeepsUniformSample(
 
   return false
 }
+
+export type GraphPoint = [number, number]
+
+/**
+ * Bounded, viewport-error adaptive polylines. Never clamp independent samples:
+ * clip actual resolved segments instead, so a finite crossing between samples
+ * is retained. Unresolved curvature/nonfinite intervals are gaps, not bridges.
+ * Explicit exclusions are interval boundaries even when no grid hits them.
+ */
+export function sampleGraphSegments(
+  evaluate: (x: number) => number,
+  xDomain: [number, number],
+  yDomain: [number, number],
+  width = 800,
+  height = 400,
+  exclusions: number[] = [],
+): GraphPoint[][] {
+  const bounds = paddedYBounds(...yDomain)
+  if (!bounds || !Number.isFinite(xDomain[0]) || !Number.isFinite(xDomain[1]) ||
+      !(xDomain[0] < xDomain[1])) return []
+  const segments: GraphPoint[][] = []
+  const cache = new Map<number, number>()
+  const excluded = new Set(exclusions)
+  let current: GraphPoint[] | null = null
+  let intervalStart = 0
+  let intervalBudget = 32_768
+  const read = (x: number): number => {
+    if (excluded.has(x)) return Number.NaN
+    if (cache.has(x)) return cache.get(x)!
+    if (cache.size >= 32_768 || cache.size - intervalStart >= intervalBudget) return Number.NaN
+    let y: number
+    try { y = evaluate(x) } catch { y = Number.NaN }
+    cache.set(x, y)
+    return y
+  }
+  const gap = () => { current = null }
+  const emit = (a: GraphPoint, b: GraphPoint) => {
+    // Liang-Barsky in y, after continuity/curvature has been resolved.
+    let start = a
+    let end = b
+    if ((a[1] < bounds.lo && b[1] < bounds.lo) ||
+        (a[1] > bounds.hi && b[1] > bounds.hi)) { gap(); return }
+    const crossing = (y: number): GraphPoint => {
+      const scale = Math.max(Math.abs(a[1]), Math.abs(b[1]), Math.abs(y), 1)
+      const fraction = (y / scale - a[1] / scale) / (b[1] / scale - a[1] / scale)
+      return [a[0] + (b[0] - a[0]) * fraction, y]
+    }
+    if (a[1] < bounds.lo) start = crossing(bounds.lo)
+    if (a[1] > bounds.hi) start = crossing(bounds.hi)
+    if (b[1] < bounds.lo) end = crossing(bounds.lo)
+    if (b[1] > bounds.hi) end = crossing(bounds.hi)
+    if (!current || current[current.length - 1][0] !== start[0] || current[current.length - 1][1] !== start[1]) {
+      current = [start]
+      segments.push(current)
+    }
+    current.push(end)
+  }
+  const tolerance = (yDomain[1] - yDomain[0]) * 0.5 / Math.max(height, 1)
+  const visit = (x0: number, x1: number, depth: number): void => {
+    const xs = [x0, x0 + (x1 - x0) / 4, x0 + (x1 - x0) / 2, x0 + 3 * (x1 - x0) / 4, x1]
+    const ys = xs.map(read)
+    const finite = ys.every(Number.isFinite)
+    // Resolve a nonfinite boundary to subpixel precision, not indefinitely.
+    if (!finite && (x1 - x0) * Math.max(width, 1) / (xDomain[1] - xDomain[0]) < 0.001) { gap(); return }
+    if (finite && (ys.every(y => y < bounds.lo) || ys.every(y => y > bounds.hi))) { gap(); return }
+    const linear = finite && ys.slice(1, 4).every((y, i) =>
+      Math.abs(y - (ys[0] * (1 - (i + 1) / 4) + ys[4] * (i + 1) / 4)) <= tolerance)
+    if (linear) { emit([x0, ys[0]], [x1, ys[4]]); return }
+    if (depth >= 24 || xs[2] === x0 || xs[2] === x1 || cache.size >= 32_768 ||
+        cache.size - intervalStart >= intervalBudget ||
+        ys.every(y => !Number.isFinite(y))) { gap(); return }
+    visit(x0, xs[2], depth + 1)
+    visit(xs[2], x1, depth + 1)
+  }
+  const cuts = [xDomain[0], ...exclusions.filter(x => x > xDomain[0] && x < xDomain[1]), xDomain[1]]
+    .sort((a, b) => a - b)
+  const steps = Math.max(32, Math.min(2048, Math.ceil(Math.max(width, 1) / 4)))
+  // Fair budget: a highly oscillatory interval must not starve later branches.
+  intervalBudget = Math.max(5, Math.floor(32_768 / (steps * (cuts.length - 1))))
+  for (let cut = 1; cut < cuts.length; cut++) {
+    gap()
+    const lo = cuts[cut - 1]
+    const hi = cuts[cut]
+    for (let i = 0; i < steps; i++) {
+      intervalStart = cache.size
+      visit(i === 0 ? lo : lo + (hi - lo) * i / steps,
+        i === steps - 1 ? hi : lo + (hi - lo) * (i + 1) / steps, 0)
+    }
+  }
+  return segments.filter(segment => segment.length >= 2)
+}

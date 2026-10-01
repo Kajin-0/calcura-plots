@@ -51,6 +51,25 @@ test('steep finite odd-power curves still draw without a plot error', async ({
   await selectPreset(page, 'steep-odd-power')
   expect(await curvePathCount(page)).toBeGreaterThanOrEqual(1)
   await assertCurvePixelsStayInHost(page)
+  const extent = await page.locator(curvePath).evaluateAll((nodes) =>
+    Math.max(...nodes.map(node => (node as SVGPathElement).getBBox().height)),
+  )
+  const plot = await page.locator(`${graphHost} .zoom-and-drag`).boundingBox()
+  expect(extent).toBeGreaterThan(plot!.height * 0.8)
+  const crossesInterior = await page.locator(curvePath).evaluateAll((nodes) => {
+    const surface = document.querySelector('.zoom-and-drag')!.getBoundingClientRect()
+    return nodes.some(node => {
+      const path = node as SVGPathElement
+      for (let i = 0; i <= 32; i++) {
+        const point = path.getPointAtLength(path.getTotalLength() * i / 32)
+          .matrixTransform(path.getScreenCTM()!)
+        if (point.x > surface.left && point.x < surface.right &&
+            point.y > surface.top + 10 && point.y < surface.bottom - 10) return true
+      }
+      return false
+    })
+  })
+  expect(crossesInterior).toBe(true)
 })
 
 test('smooth Calcura LaTeX functions render through the owned evaluator', async ({
@@ -77,6 +96,28 @@ test('1/x remains split across its vertical asymptote after LaTeX conversion', a
 }) => {
   await selectPreset(page, 'reciprocal')
   expect(await curvePathCount(page)).toBeGreaterThanOrEqual(2)
+  const geometry = await page.locator(curvePath).evaluateAll(nodes => nodes.map(node => {
+    const box = (node as SVGPathElement).getBBox()
+    return [box.x, box.x + box.width]
+  }))
+  const width = Number(await page.locator(`${graphHost} .zoom-and-drag`).getAttribute('width'))
+  for (const [lo, hi] of geometry) expect(hi <= width / 2 || lo >= width / 2).toBe(true)
+})
+
+test('cotangent curves stay separated at every visible pole', async ({ page }) => {
+  await page.getByRole('textbox', { name: 'Function expression' }).fill('\\cot(x)')
+  await expect(page.locator('[role="alert"]')).toHaveCount(0)
+  await expect(page.locator(curvePath).first()).toBeVisible()
+  const geometry = await page.locator(curvePath).evaluateAll(nodes => nodes.map(node => {
+    const box = (node as SVGPathElement).getBBox()
+    return [box.x, box.x + box.width]
+  }))
+  const width = Number(await page.locator(`${graphHost} .zoom-and-drag`).getAttribute('width'))
+  expect(geometry.length).toBeGreaterThanOrEqual(4)
+  for (const pole of [-Math.PI, 0, Math.PI]) {
+    const px = width * (pole + 10) / 20
+    for (const [lo, hi] of geometry) expect(hi <= px || lo >= px).toBe(true)
+  }
 })
 
 test('shifted reciprocal remains split across x = 2', async ({ page }) => {

@@ -16,13 +16,7 @@ import {
   compileGraphFunctions,
   GraphExpressionError,
 } from './graph/expressionAdapter'
-import {
-  clampGraphSampleToYDomain,
-  clipGraphSampleToYDomain,
-  graphDropClipKeepsUniformSample,
-  resolvePlotAxisDomain,
-  resolvePlotYDomain,
-} from './graph/sampleClip'
+import { ADAPTIVE_POLYLINE, type AdaptiveDatum } from './graph/adaptivePolyline'
 import { renderSemanticOverlays } from './graph/semanticOverlay'
 import type {
   CompiledGraphFunction,
@@ -206,41 +200,16 @@ export default function FunctionGraph({
       previousViewportKeyRef.current = nextViewportKey
     }
 
-    const liveYDomain = resolvePlotYDomain(
-      chartRef.current?.meta.yScale?.domain(),
-      [yMin, yMax],
-    )
-    const [clipYMin, clipYMax] = liveYDomain
-    const [sampleXMin, sampleXMax] = viewportChanged
-      ? [xMin, xMax]
-      : resolvePlotAxisDomain(chartRef.current?.meta.xScale?.domain(), [xMin, xMax])
-
     options.data = compilation.compiled.map(
-      (compiled): FunctionPlotDatum => {
-        const dropClipKeepsSamples = graphDropClipKeepsUniformSample(
-          compiled.evaluate,
-          sampleXMin,
-          sampleXMax,
-          clipYMin,
-          clipYMax,
-        )
-
+      (compiled): AdaptiveDatum => {
         return {
-          fn: (scope: FunctionPlotDatumScope) => {
-            const y = compiled.evaluate(Number(scope.x))
-            const yDomain = resolvePlotYDomain(
-              chartRef.current?.meta.yScale?.domain(),
-              [yMin, yMax],
-            )
-            return dropClipKeepsSamples
-              ? clipGraphSampleToYDomain(y, yDomain[0], yDomain[1])
-              : clampGraphSampleToYDomain(y, yDomain[0], yDomain[1])
-          },
+          fn: (scope: FunctionPlotDatumScope) => compiled.evaluate(Number(scope.x)),
           fnType: 'linear',
-          graphType: 'polyline',
+          graphType: ADAPTIVE_POLYLINE,
           sampler: 'builtIn',
           range: compiled.definition.domain,
           color: compiled.definition.color,
+          calcuraExclusions: compiled.resolvedExclusions.map(exclusion => exclusion.x),
         }
       },
     )
