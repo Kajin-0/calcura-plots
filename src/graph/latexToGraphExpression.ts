@@ -254,6 +254,17 @@ function normalizeAbsoluteValueBars(expression: string): string {
     .replace(/\\left\|/g, '|')
     .replace(/\\right\|/g, '|')
 
+  // `\arctan|2x|` has already been renamed to `atan|2x|`. Replacing the bars
+  // alone would glue that into `atanabs(...)`, which later splits into the
+  // symbol `atan` times `abs(...)`.
+  const functionThenAbsolute = [...FUNCTION_NAMES]
+    .sort((left, right) => right.length - left.length)
+    .join('|')
+  source = source.replace(
+    new RegExp(`(${functionThenAbsolute})\\|([^|]+)\\|`, 'g'),
+    '$1(abs($2))',
+  )
+
   for (let guard = 0; guard < 12; guard += 1) {
     const next = source.replace(/\|([^|]+)\|/g, 'abs($1)')
     if (next === source) {
@@ -272,6 +283,67 @@ function normalizePiImplicitMultiplication(expression: string): string {
   source = source.replace(/(?<![a-zA-Z*])pi([a-zA-Z])/g, 'pi*$1')
   source = source.replace(/(?<![a-zA-Z*])pi\(/g, 'pi*(')
   return source
+}
+
+function matchFunctionNameAt(
+  source: string,
+  index: number,
+  namesLongestFirst: string[],
+): string | null {
+  for (const name of namesLongestFirst) {
+    if (source.startsWith(name, index)) {
+      return name
+    }
+  }
+  return null
+}
+
+/**
+ * `\sin\sqrt{x}` becomes `sinsqrt(...)` after radical replacement and renaming.
+ * The implicit-multiplication pass would then split that into the symbol
+ * `sin` times `sqrt(...)`. A function name glued to the next call is composition.
+ */
+function wrapJuxtaposedFunctionCalls(expression: string): string {
+  const names = [...FUNCTION_NAMES].sort((left, right) => right.length - left.length)
+  let output = ''
+  let index = 0
+
+  while (index < expression.length) {
+    if (index > 0 && /[A-Za-z0-9_]/.test(expression[index - 1])) {
+      output += expression[index]
+      index += 1
+      continue
+    }
+
+    const outer = matchFunctionNameAt(expression, index, names)
+    if (!outer) {
+      output += expression[index]
+      index += 1
+      continue
+    }
+
+    const innerIndex = index + outer.length
+    const inner = matchFunctionNameAt(expression, innerIndex, names)
+    const open = inner ? innerIndex + inner.length : -1
+    if (!inner || expression[open] !== '(') {
+      output += outer
+      index += outer.length
+      continue
+    }
+
+    const close = findBalancedClose(expression, open, '(', ')')
+    if (close < 0) {
+      output += outer
+      index += outer.length
+      continue
+    }
+
+    const argument = expression.slice(open + 1, close)
+    output += `${outer}(${inner}(${argument}))`
+    index = close + 1
+  }
+
+  return output
 }
 
 function normalizeKeyboardLetterProducts(expression: string): string {
@@ -533,6 +605,7 @@ export function latexToGraphExpression(latex: string): string {
   source = wrapPostfixFunctionPowers(source, FUNCTION_NAMES)
 
   source = source.replace(/\{/g, '(').replace(/\}/g, ')')
+  source = wrapJuxtaposedFunctionCalls(source)
 
   const functionPattern = FUNCTION_NAMES.join('|')
   source = source.replace(

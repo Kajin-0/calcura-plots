@@ -53,6 +53,66 @@ test('indexed odd roots preserve the real negative branch', () => {
   assert.match(compiled.normalizedExpression, /nthRoot/)
 })
 
+test('inverse trig of an absolute value stays a function call', () => {
+  const compiled = compileGraphFunction({
+    id: 'f',
+    expression: '\\arctan|2x|',
+    inputFormat: 'latex',
+  })
+  const delimited = compileGraphFunction({
+    id: 'g',
+    expression: '\\arctan\\left|2x\\right|',
+    inputFormat: 'latex',
+  })
+
+  assert.match(compiled.normalizedExpression, /^atan\(abs\(/)
+  assert.equal(compiled.evaluate(0), 0)
+  assert.ok(Math.abs(compiled.evaluate(1) - Math.atan(2)) < 1e-12)
+  assert.ok(Math.abs(delimited.evaluate(-1) - Math.atan(2)) < 1e-12)
+})
+
+test('every graph function of an absolute value or radical stays a call', () => {
+  const names = [
+    'sin', 'cos', 'tan', 'sec', 'csc', 'cot',
+    'arcsin', 'arccos', 'arctan',
+    'sinh', 'cosh', 'tanh', 'sech', 'csch', 'coth',
+    'ln', 'log', 'exp',
+  ]
+
+  for (const name of names) {
+    const absolute = compileGraphFunction({
+      id: `${name}-abs`,
+      expression: `\\${name}|2x|`,
+      inputFormat: 'latex',
+    })
+    const radical = compileGraphFunction({
+      id: `${name}-sqrt`,
+      expression: `\\${name}\\sqrt{x}`,
+      inputFormat: 'latex',
+    })
+
+    assert.match(absolute.normalizedExpression, /\(abs\(/, name)
+    assert.match(radical.normalizedExpression, /\(sqrt\(/, name)
+    assert.equal(absolute.normalizedExpression.includes('*abs'), false, absolute.normalizedExpression)
+    assert.equal(radical.normalizedExpression.includes('*sqrt'), false, radical.normalizedExpression)
+    assert.ok(Number.isFinite(absolute.evaluate(0.25)), `${name} abs`)
+    assert.ok(Number.isFinite(radical.evaluate(0.25)), `${name} sqrt`)
+  }
+
+  const multiplied = compileGraphFunction({
+    id: 'product',
+    expression: '2\\sin(x)',
+    inputFormat: 'latex',
+  })
+  const adjacent = compileGraphFunction({
+    id: 'adjacent',
+    expression: 'x\\sin(x)',
+    inputFormat: 'latex',
+  })
+  assert.match(multiplied.normalizedExpression, /2\*sin\(/)
+  assert.match(adjacent.normalizedExpression, /x\*sin\(/)
+})
+
 test('Calcura tall delimiters and absolute-value delimiters are accepted', () => {
   const fraction = compileGraphFunction({
     id: 'f',
