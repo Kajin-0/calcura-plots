@@ -11,6 +11,7 @@ import {
   GraphLatexError,
   latexToGraphExpression,
 } from './latexToGraphExpression'
+import { compileNumericEvaluator } from './numericFunction'
 import type {
   CompiledGraphFunction,
   GraphExclusion,
@@ -232,7 +233,8 @@ export function compileGraphFunction(
 
   validateNode(root, variable)
 
-  const compiled = root.compile()
+  const numeric = compileNumericEvaluator(root, variable)
+  const compiled = numeric ? null : root.compile()
   const exclusions = definition.exclusions ?? []
   const excludedDomainEndpoints = (definition.domainEndpoints ?? []).filter(
     (endpoint) => !endpoint.included,
@@ -244,7 +246,8 @@ export function compileGraphFunction(
     }
 
     try {
-      return asFiniteReal(compiled.evaluate({ [variable]: x }))
+      if (numeric) return numeric(x)
+      return asFiniteReal(compiled!.evaluate({ [variable]: x }))
     } catch {
       return Number.NaN
     }

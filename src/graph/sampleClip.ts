@@ -177,12 +177,17 @@ export function sampleGraphSegments(
     const xs = [x0, x0 + (x1 - x0) / 4, x0 + (x1 - x0) / 2, x0 + 3 * (x1 - x0) / 4, x1]
     const ys = xs.map(read)
     const finite = ys.every(Number.isFinite)
-    // Resolve a nonfinite boundary to subpixel precision, not indefinitely.
-    if (!finite && (x1 - x0) * Math.max(width, 1) / (xDomain[1] - xDomain[0]) < 0.001) { gap(); return }
+    // One screen pixel is the visible limit. Hunting a pole to 0.001px
+    // multiplies the sample count without changing the painted curve.
+    // A non-linear subpixel interval is left as a gap so a vertical asymptote
+    // is not bridged; a linear one still emits, which keeps steep finite crossings.
+    const pixelSpan = (x1 - x0) * Math.max(width, 1) / (xDomain[1] - xDomain[0])
+    if (!finite && pixelSpan < 1) { gap(); return }
     if (finite && (ys.every(y => y < bounds.lo) || ys.every(y => y > bounds.hi))) { gap(); return }
     const linear = finite && ys.slice(1, 4).every((y, i) =>
       Math.abs(y - (ys[0] * (1 - (i + 1) / 4) + ys[4] * (i + 1) / 4)) <= tolerance)
     if (linear) { emit([x0, ys[0]], [x1, ys[4]]); return }
+    if (pixelSpan < 1) { gap(); return }
     if (depth >= 24 || xs[2] === x0 || xs[2] === x1 || cache.size >= 32_768 ||
         cache.size - intervalStart >= intervalBudget ||
         ys.every(y => !Number.isFinite(y))) { gap(); return }

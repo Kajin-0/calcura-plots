@@ -3,7 +3,11 @@ import { sampleGraphSegments } from './sampleClip'
 
 // function-plot exposes registerGraphType but its datum union lists built-ins only.
 export const ADAPTIVE_POLYLINE = 'calcura-adaptive-polyline' as FunctionPlotDatum['graphType']
-export type AdaptiveDatum = FunctionPlotDatum & { calcuraExclusions?: number[] }
+export type AdaptiveDatum = FunctionPlotDatum & {
+  calcuraExclusions?: number[]
+  /** Direct numeric evaluator. Avoids allocating a scope object per sample. */
+  calcuraEvaluate?: (x: number) => number
+}
 
 registerGraphType('calcura-adaptive-polyline', (chart: Chart) => selection => {
   selection.each(function (this: SVGGElement, datum: AdaptiveDatum) {
@@ -12,7 +16,8 @@ registerGraphType('calcura-adaptive-polyline', (chart: Chart) => selection => {
     const y = chart.meta.yScale.domain()
     const fn = datum.fn
     if (typeof fn !== 'function') return
-    const segments = sampleGraphSegments(value => Number(fn({ x: value })),
+    const segments = sampleGraphSegments(
+      datum.calcuraEvaluate ?? (value => Number(fn({ x: value }))),
       [Math.max(x[0], range[0]), Math.min(x[1], range[1])], [y[0], y[1]],
       chart.meta.width, chart.meta.height, datum.calcuraExclusions)
     const group = this as SVGGElement

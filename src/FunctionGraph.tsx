@@ -60,6 +60,28 @@ type EventedChart = Chart & {
   ) => EventedChart
   removeAllListeners: (event?: string) => EventedChart
   tip: PlotTip
+  draw?: () => void
+  __calcuraDrawCoalesced?: boolean
+  __calcuraDrawFrame?: number
+}
+
+/**
+ * function-plot redraws the whole chart on every zoom event, which fires many
+ * times per frame during a drag. Keep the latest scale and paint once per frame.
+ * The scheduled draw reads the chart's current scale, so skipped events are not lost.
+ */
+function coalesceChartDraw(chart: EventedChart): void {
+  if (chart.__calcuraDrawCoalesced || typeof chart.draw !== 'function') return
+  if (typeof requestAnimationFrame !== 'function') return
+  const rawDraw = chart.draw.bind(chart)
+  chart.__calcuraDrawCoalesced = true
+  chart.draw = () => {
+    if (chart.__calcuraDrawFrame) return
+    chart.__calcuraDrawFrame = requestAnimationFrame(() => {
+      chart.__calcuraDrawFrame = 0
+      rawDraw()
+    })
+  }
 }
 
 function getErrorMessage(error: unknown): string {
@@ -210,6 +232,7 @@ export default function FunctionGraph({
           range: compiled.definition.domain,
           color: compiled.definition.color,
           calcuraExclusions: compiled.resolvedExclusions.map(exclusion => exclusion.x),
+          calcuraEvaluate: compiled.evaluate,
         }
       },
     )
@@ -218,6 +241,7 @@ export default function FunctionGraph({
 
     try {
       const chart = functionPlot(options) as EventedChart
+      coalesceChartDraw(chart)
 
       if (chartRef.current !== chart) {
         if (chartRef.current && overlayListenerRef.current) {
@@ -349,6 +373,10 @@ export default function FunctionGraph({
 
   useLayoutEffect(() => {
     return () => {
+      if (chartRef.current?.__calcuraDrawFrame) {
+        cancelAnimationFrame(chartRef.current.__calcuraDrawFrame)
+        chartRef.current.__calcuraDrawFrame = 0
+      }
       if (chartRef.current && overlayListenerRef.current) {
         chartRef.current.removeListener('after:draw', overlayListenerRef.current)
       }
