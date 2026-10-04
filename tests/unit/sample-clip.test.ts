@@ -91,6 +91,31 @@ test('explicit exclusions and nonfinite intervals are gaps', () => {
   assert.deepEqual(sampleGraphSegments(() => 1e8, [-1, 1], [-1, 1]), [])
 })
 
+test('x^2 sin(3x) stays one connected curve when the viewport can hold it', () => {
+  const fn = (x: number) => x * x * Math.sin(3 * x)
+  const segments = sampleGraphSegments(fn, [-10, 10], [-120, 120], 800, 400)
+  assert.equal(segments.length, 1)
+  const points = segments[0]
+  for (let i = 1; i < points.length; i++) {
+    assert.ok(points[i][0] > points[i - 1][0])
+    assert.ok(points[i][0] - points[i - 1][0] < 0.2)
+  }
+})
+
+test('x^2 sin(3x) does not drop samples that sit inside the default window', () => {
+  const fn = (x: number) => x * x * Math.sin(3 * x)
+  const segments = sampleGraphSegments(fn, [-10, 10], [-10, 10], 800, 400)
+  const pixel = 20 / 800
+  for (let i = 0; i <= 200; i++) {
+    const x = -10 + (20 * i) / 200
+    const y = fn(x)
+    if (Math.abs(y) > 10) continue
+    const covered = segments.some((points) => points.some((point) =>
+      Math.abs(point[0] - x) <= pixel * 3 && Math.abs(point[1] - y) < 1.5))
+    assert.ok(covered, `missing in-range sample at x=${x}`)
+  }
+})
+
 test('ordinary functions preserve finite viewport geometry and sampling is bounded', () => {
   for (const fn of [(x: number) => x, (x: number) => x * x, (x: number) => x ** 3, Math.sin]) {
     assert.ok(sampleGraphSegments(fn, [-2, 2], [-3, 3]).length > 0)
