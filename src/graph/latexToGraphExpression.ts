@@ -204,7 +204,8 @@ function replaceRadicals(expression: string): string {
       source.slice(0, sqrtIndex) +
       replacement +
       source.slice(radicandClose + 1)
-    cursor = sqrtIndex + replacement.length
+    // Continue inside the replacement: its radicand may contain more roots.
+    cursor = sqrtIndex
   }
 
   return source
@@ -305,6 +306,19 @@ function matchFunctionNameAt(
  */
 function wrapJuxtaposedFunctionCalls(expression: string): string {
   const names = [...FUNCTION_NAMES].sort((left, right) => right.length - left.length)
+  const readChain = (start: number, depth = 0): { text: string; end: number } | null => {
+    if (depth > 32) return null
+    const name = matchFunctionNameAt(expression, start, names)
+    if (!name) return null
+    const next = start + name.length
+    if (expression[next] === '(') {
+      const close = findBalancedClose(expression, next, '(', ')')
+      if (close < 0) return null
+      return { text: expression.slice(start, close + 1), end: close + 1 }
+    }
+    const inner = readChain(next, depth + 1)
+    return inner ? { text: `${name}(${inner.text})`, end: inner.end } : null
+  }
   let output = ''
   let index = 0
 
@@ -325,6 +339,10 @@ function wrapJuxtaposedFunctionCalls(expression: string): string {
     const innerIndex = index + outer.length
     const inner = matchFunctionNameAt(expression, innerIndex, names)
     const open = inner ? innerIndex + inner.length : -1
+    if (inner && expression[open] !== '(') {
+      const chain = readChain(index)
+      if (chain) { output += chain.text; index = chain.end; continue }
+    }
     if (!inner || expression[open] !== '(') {
       output += outer
       index += outer.length
@@ -548,6 +566,15 @@ export function latexToGraphExpression(latex: string): string {
   }
 
   source = normalizeHarmlessGroupingBrackets(source)
+  // Preserve the direction of explicit delimiters before removing \left/
+  // \right. Plain-bar regexes cannot distinguish nested open/close pairs.
+  let absoluteDepth = 0
+  source = source.replace(/\\(left|right)\s*\|/g, (_, direction: string) => {
+    if (direction === 'left') { absoluteDepth++; return 'abs(' }
+    if (absoluteDepth === 0) throw new GraphLatexError('Unmatched absolute-value delimiter.')
+    absoluteDepth--; return ')'
+  })
+  if (absoluteDepth !== 0) throw new GraphLatexError('Unmatched absolute-value delimiter.')
   source = source
     .replace(/--/g, '+')
     .replace(/\+-/g, '-')
@@ -571,7 +598,11 @@ export function latexToGraphExpression(latex: string): string {
   // Explicit multiplication before a serialized function command.
   source = source.replace(
     /([a-zA-Z0-9\)\}])\\(arccos|arcsin|arctan|sinh|cosh|tanh|sech|csch|coth|sin|cos|tan|sec|csc|cot|ln|log|exp|sqrt)/g,
-    '$1*\\$2',
+    (match, prefix: string, name: string, offset: number, input: string) => {
+      // The final 'n' in \sin\cos is NOT an independent variable factor.
+      const precedingCommand = input.slice(0, offset + 1).match(/\\([A-Za-z]+)$/)?.[1]
+      return precedingCommand && precedingCommand !== 'pi' ? match : `${prefix}*\\${name}`
+    },
   )
 
   source = rewritePreArgumentFunctionPowers(source)

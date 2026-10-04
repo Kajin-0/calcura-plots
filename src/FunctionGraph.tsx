@@ -233,6 +233,8 @@ export default function FunctionGraph({
           color: compiled.definition.color,
           calcuraExclusions: compiled.resolvedExclusions.map(exclusion => exclusion.x),
           calcuraEvaluate: compiled.evaluate,
+          calcuraRange: compiled.range,
+          calcuraSamplingExclusions: compiled.samplingExclusions,
         }
       },
     )

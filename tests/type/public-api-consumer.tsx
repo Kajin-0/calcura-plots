@@ -1,6 +1,7 @@
 import {
   FunctionGraph,
   createCalcuraGraphFunctions,
+  createGraphSampler,
   type FunctionGraphProps,
   type PlotViewport,
 } from '../../src'
@@ -29,6 +30,12 @@ const props: FunctionGraphProps = {
   height: 360,
   className: 'calcura-host-graph',
 }
+
+const sampler = createGraphSampler(functions[0])
+const sampledPoints: [number, number][][] = sampler.sample(viewport, 330, 300)
+const evaluatedValue: number = sampler.evaluate(1)
+void sampledPoints
+void evaluatedValue
 
 export function PublicApiConsumerFixture() {
   return <FunctionGraph {...props} />

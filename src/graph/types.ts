@@ -49,5 +49,7 @@ export interface CompiledGraphFunction {
   normalizedExpression: string
   evaluate: (x: number) => number
   evaluateRaw: (x: number) => number
+  range: import('./rangeFunction').GraphRangeEvaluator
+  samplingExclusions: (lo: number, hi: number) => number[]
   resolvedExclusions: Array<GraphExclusion & { y?: number }>
 }

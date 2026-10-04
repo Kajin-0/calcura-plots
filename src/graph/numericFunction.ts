@@ -24,11 +24,9 @@ const DIRECT_MATH: Record<string, string> = {
   asinh: 'Math.asinh',
   atan: 'Math.atan',
   atanh: 'Math.atanh',
-  ceil: 'Math.ceil',
   cos: 'Math.cos',
   cosh: 'Math.cosh',
   exp: 'Math.exp',
-  floor: 'Math.floor',
   log10: 'Math.log10',
   sign: 'Math.sign',
   sin: 'Math.sin',
@@ -60,17 +58,17 @@ function emitCall(name: string, args: string[]): string {
       return `(1/Math.tan(${args[0]}))`
     case 'sech':
       return `(1/Math.cosh(${args[0]}))`
+    // mathjs has different rounding/tolerance and near-zero hyperbolic
+    // conventions. Do not approximate these contracts with Math.*.
+    case 'ceil':
+    case 'floor':
+    case 'round':
     case 'csch':
-      return `(1/Math.sinh(${args[0]}))`
     case 'coth':
-      return `(1/Math.tanh(${args[0]}))`
+      throw new NumericEmitError(name)
     case 'nthRoot':
       if (args.length === 1) return `Math.sqrt(${args[0]})`
       if (args.length === 2) return `nthRoot(${args[0]},${args[1]})`
-      break
-    case 'round':
-      if (args.length === 1) return `Math.round(${args[0]})`
-      if (args.length === 2) return `roundTo(${args[0]},${args[1]})`
       break
     default:
       break
@@ -146,11 +144,6 @@ export function compileNumericEvaluator(
           return Math.sign(value) * Math.pow(Math.abs(value), 1 / root);
         }
         return Math.pow(value, 1 / root);
-      };
-      const roundTo = (value, digits) => {
-        if (!Number.isFinite(value) || !Number.isFinite(digits)) return NaN;
-        const scale = Math.pow(10, digits);
-        return Math.round(value * scale) / scale;
       };
       const y = (${body});
       return typeof y === "number" && Number.isFinite(y) ? y : NaN;`,

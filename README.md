@@ -29,6 +29,7 @@ No Calcura source code is imported or modified.
 import {
   FunctionGraph,
   createCalcuraGraphFunctions,
+  createGraphSampler,
   type PlotViewport,
 } from 'calcura-plots'
 ```
@@ -53,6 +54,12 @@ const functions = createCalcuraGraphFunctions([
 ```
 
 The public surface intentionally does not expose parser/compiler internals.
+
+`createGraphSampler(definition)` is the headless public counterpart of the SVG
+renderer. Its `evaluate(x)` and `sample(viewport, width, height)` methods use the
+same validated expression, domain, exclusions, and adaptive sampling as
+`FunctionGraph`. Hosts can certify generated graph sources without importing
+private modules. See [graph correctness certification](docs/GRAPH_CERTIFICATION.md).
 
 ## Android certification
 
@@ -122,7 +129,7 @@ React, `function-plot`, and `mathjs` stay external. The wrapper does not duplica
 Android Studio is not required for the normal browser/library tests:
 
 ```bash
-npm install
+npm ci
 npm run test:unit
 npm run typecheck
 npm run test:public-api

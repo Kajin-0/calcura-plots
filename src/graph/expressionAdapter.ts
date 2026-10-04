@@ -12,6 +12,8 @@ import {
   latexToGraphExpression,
 } from './latexToGraphExpression'
 import { compileNumericEvaluator } from './numericFunction'
+import { compileRangeEvaluator } from './rangeFunction'
+import { compileSamplingExclusions } from './samplingExclusions'
 import type {
   CompiledGraphFunction,
   GraphExclusion,
@@ -230,7 +232,13 @@ export function compileGraphFunction(
   definition: GraphFunctionDefinition,
 ): CompiledGraphFunction {
   const variable = validateDefinition(definition)
-  const normalizedExpression = normalizeSourceExpression(definition)
+  let normalizedExpression = normalizeSourceExpression(definition)
+  // Numeric juxtaposition is multiplication BEFORE exponent binding, not a
+  // function-call AST rewritten afterwards: x(group)^2 means x * group^2.
+  const escapedVariable = variable.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  normalizedExpression = normalizedExpression
+    .replace(new RegExp(`(?<![A-Za-z_])${escapedVariable}\\s*\\(`, 'g'), `${variable}*(`)
+    .replace(/\)\s*\(/g, ')*(')
 
   if (!normalizedExpression.trim()) {
     throw new GraphExpressionError('Graph expression must not be empty after normalization.')
@@ -251,7 +259,7 @@ export function compileGraphFunction(
   validateNode(root, variable)
 
   const numeric = compileNumericEvaluator(root, variable)
-  const compiled = numeric ? null : root.compile()
+  let compiled = numeric ? null : root.compile()
   const exclusions = definition.exclusions ?? []
   const excludedDomainEndpoints = (definition.domainEndpoints ?? []).filter(
     (endpoint) => !endpoint.included,
@@ -263,7 +271,13 @@ export function compileGraphFunction(
     }
 
     try {
-      if (numeric) return numeric(x)
+      if (numeric) {
+        const value = numeric(x)
+        if (Number.isFinite(value)) return value
+        // Complex intermediate values can yield a real final result (abs,
+        // cancellation, squaring). A NaN from Math.* is not proof of a gap.
+      }
+      compiled ??= root.compile()
       return asFiniteReal(compiled!.evaluate({ [variable]: x }))
     } catch {
       return Number.NaN
@@ -308,6 +322,8 @@ export function compileGraphFunction(
     normalizedExpression,
     evaluate,
     evaluateRaw,
+    range: compileRangeEvaluator(root, variable),
+    samplingExclusions: compileSamplingExclusions(root, variable),
     resolvedExclusions,
   }
 }

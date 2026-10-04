@@ -1,5 +1,6 @@
 export { default as FunctionGraph } from './FunctionGraph'
 export type { FunctionGraphProps } from './FunctionGraph'
+export { createGraphSampler } from './graph/graphSampler'
 
 export {
   createCalcuraGraphFunction,

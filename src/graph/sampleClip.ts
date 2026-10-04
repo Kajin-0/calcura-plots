@@ -8,6 +8,7 @@
  * Returning NaN drops the sample so d3 breaks the path instead of drawing a spike.
  * The pad lets a legitimate curve continue a short distance off-screen.
  */
+import type { GraphRangeEvaluator } from './rangeFunction'
 export const VIEWPORT_Y_CLIP_PAD_RATIO = 1
 
 export function resolvePlotAxisDomain(
@@ -131,6 +132,7 @@ export function sampleGraphSegments(
   width = 800,
   height = 400,
   exclusions: number[] = [],
+  range?: GraphRangeEvaluator,
 ): GraphPoint[][] {
   const bounds = paddedYBounds(...yDomain)
   if (!bounds || !Number.isFinite(xDomain[0]) || !Number.isFinite(xDomain[1]) ||
@@ -141,10 +143,12 @@ export function sampleGraphSegments(
   let current: GraphPoint[] | null = null
   let intervalStart = 0
   let intervalBudget = 32_768
+  let readLimit = 32_768
   const read = (x: number): number => {
     if (excluded.has(x)) return Number.NaN
-    if (cache.has(x)) return cache.get(x)!
-    if (cache.size >= 32_768 || cache.size - intervalStart >= intervalBudget) return Number.NaN
+    const cached = cache.get(x)
+    if (cached !== undefined) return cached
+    if (cache.size >= readLimit) return Number.NaN
     let y: number
     try { y = evaluate(x) } catch { y = Number.NaN }
     cache.set(x, y)
@@ -173,46 +177,71 @@ export function sampleGraphSegments(
     current.push(end)
   }
   const tolerance = (yDomain[1] - yDomain[0]) * 0.5 / Math.max(height, 1)
-  const visit = (x0: number, x1: number, depth: number): void => {
-    const xs = [x0, x0 + (x1 - x0) / 4, x0 + (x1 - x0) / 2, x0 + 3 * (x1 - x0) / 4, x1]
-    const ys = xs.map(read)
-    const finite = ys.every(Number.isFinite)
-    // One screen pixel is the visible limit. Hunting a pole to 0.001px
-    // multiplies the sample count without changing the painted curve.
+  const visit = (x0: number, x1: number, depth: number, limit: number): void => {
+    readLimit = limit
+    const enclosure = range?.(x0, x1)
+    if (range?.outside?.(x0, x1, bounds.lo, bounds.hi)) { gap(); return }
+    // A certified enclosure can cull without evaluating offscreen samples.
+    if (enclosure && (enclosure[1] < bounds.lo || enclosure[0] > bounds.hi)) { gap(); return }
+    const quarter = x0 + (x1 - x0) / 4
+    const middle = x0 + (x1 - x0) / 2
+    const thirdQuarter = x0 + 3 * (x1 - x0) / 4
+    const y0 = read(x0), yQuarter = read(quarter), yMiddle = read(middle), yThirdQuarter = read(thirdQuarter), y1 = read(x1)
+    const finite = Number.isFinite(y0) && Number.isFinite(yQuarter) && Number.isFinite(yMiddle) && Number.isFinite(yThirdQuarter) && Number.isFinite(y1)
     const pixelSpan = (x1 - x0) * Math.max(width, 1) / (xDomain[1] - xDomain[0])
-    if (!finite && pixelSpan < 1) { gap(); return }
-    if (finite && (ys.every(y => y < bounds.lo) || ys.every(y => y > bounds.hi))) { gap(); return }
-    const linear = finite && ys.slice(1, 4).every((y, i) =>
-      Math.abs(y - (ys[0] * (1 - (i + 1) / 4) + ys[4] * (i + 1) / 4)) <= tolerance)
-    if (linear) { emit([x0, ys[0]], [x1, ys[4]]); return }
-    if (pixelSpan < 1) {
-      // A vertical asymptote leaves both clip edges inside one pixel and must
-      // stay a gap. A smooth bend such as x^2 sin(3x) does not, so the chord
-      // is the curve at screen resolution.
-      const leavesBothSides = ys.some((y) => y < bounds.lo) && ys.some((y) => y > bounds.hi)
-      if (!leavesBothSides) emit([x0, ys[0]], [x1, ys[4]])
-      else gap()
-      return
+    // Probe agreement is NOT proof that a valley/crossing cannot be visible.
+    const observedRangeResolved = enclosure && finite &&
+      enclosure[0] >= Math.min(y0, yQuarter, yMiddle, yThirdQuarter, y1) - tolerance && enclosure[1] <= Math.max(y0, yQuarter, yMiddle, yThirdQuarter, y1) + tolerance
+    const allOffscreen = finite && (
+      Math.max(y0, yQuarter, yMiddle, yThirdQuarter, y1) < bounds.lo ||
+      Math.min(y0, yQuarter, yMiddle, yThirdQuarter, y1) > bounds.hi)
+    if (!range && allOffscreen) { gap(); return }
+    const linear = finite &&
+      Math.abs(yQuarter - (y0 * 0.75 + y1 * 0.25)) <= tolerance &&
+      Math.abs(yMiddle - (y0 * 0.5 + y1 * 0.5)) <= tolerance &&
+      Math.abs(yThirdQuarter - (y0 * 0.25 + y1 * 0.75)) <= tolerance
+    // Equal probe values may alias a periodic curve. Resolve its argument
+    // interval as well, rather than treating a whole number of cycles as flat.
+    const phaseResolved = !range?.phaseSpan || range.phaseSpan(x0, x1) <= Math.PI / 2
+    if (linear && phaseResolved && (!allOffscreen || !enclosure || observedRangeResolved)) { emit([x0, y0], [x1, y1]); return }
+    // Subpixel horizontal width alone cannot erase a tall finite branch.
+    // A real continuous, monotone probe interval narrower than half a pixel
+    // is geometrically resolved even when its slope is almost vertical.
+    if (finite && observedRangeResolved && pixelSpan <= 0.5 &&
+        ((y0 <= yQuarter && yQuarter <= yMiddle && yMiddle <= yThirdQuarter && yThirdQuarter <= y1) ||
+         (y0 >= yQuarter && yQuarter >= yMiddle && yMiddle >= yThirdQuarter && yThirdQuarter >= y1))) {
+      emit([x0, y0], [x1, y1]); return
     }
-    if (depth >= 24 || xs[2] === x0 || xs[2] === x1 || cache.size >= 32_768 ||
-        cache.size - intervalStart >= intervalBudget ||
-        ys.every(y => !Number.isFinite(y))) { gap(); return }
-    visit(x0, xs[2], depth + 1)
-    visit(xs[2], x1, depth + 1)
+    if (depth >= 40 || middle === x0 || middle === x1 || cache.size >= 32_768 ||
+        cache.size >= limit ||
+        (!Number.isFinite(y0) && !Number.isFinite(yQuarter) && !Number.isFinite(yMiddle) && !Number.isFinite(yThirdQuarter) && !Number.isFinite(y1))) { gap(); return }
+    // A pathological LEFT child must not consume the RIGHT child's budget.
+    const rightRange = range?.(middle, x1)
+    const rightOffscreen = rightRange && (rightRange[1] < bounds.lo || rightRange[0] > bounds.hi)
+    const reserve = rightOffscreen ? 5 : Math.min(256, Math.floor((limit - cache.size) / 2))
+    const middleLimit = limit - reserve
+    visit(x0, middle, depth + 1, middleLimit)
+    visit(middle, x1, depth + 1, limit)
   }
-  const cuts = [xDomain[0], ...exclusions.filter(x => x > xDomain[0] && x < xDomain[1]), xDomain[1]]
+  const cuts = [...new Set([xDomain[0], ...exclusions.filter(x => x > xDomain[0] && x < xDomain[1]), xDomain[1]])]
     .sort((a, b) => a - b)
-  const steps = Math.max(32, Math.min(2048, Math.ceil(Math.max(width, 1) / 4)))
+  const totalSteps = Math.max(32, Math.min(2048, Math.ceil(Math.max(width, 1) / 4)))
+  const stepCount = (lo: number, hi: number) => Math.max(1, Math.ceil(totalSteps * (hi - lo) / (xDomain[1] - xDomain[0])))
   // Fair budget: a highly oscillatory interval must not starve later branches.
-  intervalBudget = Math.max(5, Math.floor(32_768 / (steps * (cuts.length - 1))))
+  let remainingIntervals = cuts.slice(1).reduce((sum, hi, i) => sum + stepCount(cuts[i], hi), 0)
   for (let cut = 1; cut < cuts.length; cut++) {
     gap()
     const lo = cuts[cut - 1]
     const hi = cuts[cut]
+    const steps = stepCount(lo, hi)
     for (let i = 0; i < steps; i++) {
       intervalStart = cache.size
+      remainingIntervals--
+      // Reserve coarse coverage of every later interval, but let difficult
+      // boundaries borrow unused refinement capacity instead of disappearing.
+      intervalBudget = Math.max(5, Math.min(4096, 32_768 - cache.size - remainingIntervals * 5))
       visit(i === 0 ? lo : lo + (hi - lo) * i / steps,
-        i === steps - 1 ? hi : lo + (hi - lo) * (i + 1) / steps, 0)
+        i === steps - 1 ? hi : lo + (hi - lo) * (i + 1) / steps, 0, Math.min(32768, intervalStart + intervalBudget))
     }
   }
   return segments.filter(segment => segment.length >= 2)
