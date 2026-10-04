@@ -169,6 +169,33 @@ test('incomplete LaTeX fails closed instead of leaking commands to mathjs', () =
   )
 })
 
+test('a variable against nested parentheses is multiplication', () => {
+  const nested = compileGraphFunction({
+    id: 'nested',
+    expression: '3x\\left(\\left(x^{2}+3\\right)\\right)^{2}',
+    inputFormat: 'latex',
+    variable: 'x',
+  })
+  const spaced = compileGraphFunction({
+    id: 'spaced',
+    expression: '3z ((z^2 + 3))^2',
+    inputFormat: 'latex',
+    variable: 'z',
+  })
+  const mathjsForm = compileGraphFunction({
+    id: 'mathjs',
+    expression: '3*x((x^2+3))^2',
+    variable: 'x',
+  })
+
+  assert.equal(nested.evaluate(1), 48)
+  assert.equal(spaced.evaluate(1), 48)
+  assert.equal(mathjsForm.evaluate(1), 48)
+  assert.equal(nested.normalizedExpression.includes('x('), false)
+  assert.match(nested.normalizedExpression, /x\*\(/)
+  assert.match(spaced.normalizedExpression, /z\*\(/)
+})
+
 test('mathjs input format remains backwards compatible', () => {
   const compiled = compileGraphFunction({
     id: 'f',

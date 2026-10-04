@@ -205,6 +205,19 @@ function normalizeSourceExpression(definition: GraphFunctionDefinition): string 
   }
 }
 
+function rewriteImplicitVariableCalls(node: MathNode, variable: string): MathNode {
+  const rewritten = node.map((child) => rewriteImplicitVariableCalls(child, variable))
+  if (rewritten.type !== 'FunctionNode') return rewritten
+
+  const fn = rewritten as FunctionNode
+  const calleeName = fn.fn.type === 'SymbolNode' ? (fn.fn as SymbolNode).name : null
+  if (calleeName && ALLOWED_FUNCTION_ARITY[calleeName]) return rewritten
+  if (fn.args.length !== 1) return rewritten
+  if (calleeName !== variable && fn.fn.type === 'SymbolNode') return rewritten
+
+  return new math.OperatorNode('*', 'multiply', [fn.fn, fn.args[0]])
+}
+
 function asFiniteReal(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : Number.NaN
 }
@@ -231,6 +244,10 @@ export function compileGraphFunction(
     throw new GraphExpressionError(`Unable to parse graph expression: ${message}`)
   }
 
+  // mathjs parses x((x^2+3)) as a call. In this grammar the independent
+  // variable is a number, so a one-argument call of that variable — or of a
+  // group that is already a product — is juxtaposition.
+  root = rewriteImplicitVariableCalls(root, variable)
   validateNode(root, variable)
 
   const numeric = compileNumericEvaluator(root, variable)

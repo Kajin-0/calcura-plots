@@ -640,14 +640,14 @@ export function latexToGraphExpression(latex: string): string {
         : `${letter}*${functionName}(`,
   )
 
-  // Single-letter graph variable adjacent to a parenthesized group.
-  source = source.replace(
-    /(?<![A-Za-z\\])([A-Za-z])\((?=[+\-\d\\a-zA-Z])/g,
-    '$1*(',
-  )
-
   source = normalizeKeyboardLetterProducts(source)
   source = normalizeExponentialE(source)
+
+  // A single letter against "(" is juxtaposition, including nested groups
+  // such as x((x^2+3))^2. Approved functions are longer than one letter, so
+  // sin( stays a call. This runs after identifier splitting so a renamed
+  // multi-letter variable's last letter is covered too.
+  source = source.replace(/(?<![A-Za-z\\])([A-Za-z])\(/g, '$1*(')
 
   if (/\\[a-zA-Z]+/.test(source)) {
     throw new GraphLatexError(
