@@ -7,6 +7,7 @@ export type GraphRange = [number, number] | null
 export type GraphRangeEvaluator = ((lo: number, hi: number) => GraphRange) & {
   phaseSpan?: (lo: number, hi: number) => number
   outside?: (lo: number, hi: number, yLo: number, yHi: number) => boolean
+  mayCrossSingularity?: (lo: number, hi: number) => boolean
 }
 type Bound = (x: [number, number]) => GraphRange
 const enclose = (lo: number, hi: number): GraphRange => {
@@ -70,7 +71,13 @@ function build(node: MathNode, variable: string): Bound {
         case '-': return enclose(a[0] - b[1], a[1] - b[0])
         case '*': return multiply(a, b)
         case '/': { const inverse = reciprocal(b); return inverse && multiply(a, inverse) }
-        case '^': return b[0] === b[1] ? power(a, b[0]) : null
+        case '^': {
+          if (b[0] === b[1]) return power(a, b[0])
+          if (a[0] <= 0) return null
+          const logarithm = enclose(Math.log(a[0]), Math.log(a[1]))
+          const exponent = logarithm && multiply(logarithm, b)
+          return exponent && enclose(Math.exp(exponent[0]), Math.exp(exponent[1]))
+        }
         default: return null
       }
     }
@@ -130,12 +137,35 @@ function build(node: MathNode, variable: string): Bound {
 export function compileRangeEvaluator(root: MathNode, variable: string): GraphRangeEvaluator {
   const bound = build(root, variable)
   const phases: Bound[] = []
+  const divisors: Bound[] = []
   root.traverse(node => {
+    if (node.type === 'OperatorNode') {
+      const op = node as OperatorNode
+      if (op.op === '/') divisors.push(build(op.args[1], variable))
+      if (op.op === '^' && !(op.args[1].type === 'ConstantNode' && Number((op.args[1] as ConstantNode).value) >= 0)) {
+        const base = build(op.args[0], variable), exponent = build(op.args[1], variable)
+        divisors.push(x => {
+          const b = exponent(x)
+          return b && b[0] >= 0 ? [1, 1] : base(x)
+        })
+      }
+    }
     if (node.type !== 'FunctionNode') return
     const fn = node as FunctionNode
-    if (['sin', 'cos', 'tan', 'sec', 'csc', 'cot'].includes((fn.fn as SymbolNode).name)) phases.push(build(fn.args[0], variable))
+    const name = (fn.fn as SymbolNode).name, arg = build(fn.args[0], variable)
+    if (['sin', 'cos', 'tan', 'sec', 'csc', 'cot'].includes(name)) phases.push(arg)
+    if (['tan', 'sec', 'cot', 'csc'].includes(name)) divisors.push(x => {
+      const a = arg(x)
+      return a && trig(a, name === 'tan' || name === 'sec')
+    })
+    if (name === 'csch' || name === 'coth') divisors.push(arg)
   })
   const evaluate: GraphRangeEvaluator = (lo, hi) => bound([lo, hi])
+  if (divisors.length) evaluate.mayCrossSingularity = (lo, hi) => divisors.some(divisor => {
+    const range = divisor([lo, hi])
+    // Flat finite probes do not prove continuity across an unresolved divisor.
+    return !range || range[0] <= 0 && range[1] >= 0
+  })
   let quotient = root
   while (quotient.type === 'ParenthesisNode') quotient = (quotient as ParenthesisNode).content
   if (quotient.type === 'OperatorNode' && (quotient as OperatorNode).op === '/') {

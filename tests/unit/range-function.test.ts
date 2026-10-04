@@ -3,7 +3,7 @@ import test from 'node:test'
 import { compileGraphFunction } from '../../src/graph/expressionAdapter'
 
 test('certified interval enclosures contain dense numeric values; unknown ranges never authorize culling', () => {
-  const expressions = ['x', 'x^2', 'x^3', '2*x*(x^2+6)^4', 'abs(x)', 'sqrt(x)', 'sin(30x)', 'cos(x)', 'tan(3x+.2)', 'sec(x)', 'csc(x)', 'cot(x)', 'log(x)', 'asin(x)', 'acos(x)', 'atan(x)', 'sinh(x)', 'cosh(x)', 'sech(x)', 'tanh(x)', 'csch(x)', 'coth(x)', 'exp(x)', 'x*exp(x)', '1/(x-.0137)', '1e8*(x-.017931)^2-5']
+  const expressions = ['x', 'x^2', 'x^3', '2*x*(x^2+6)^4', 'abs(x)', 'sqrt(x)', 'sin(30x)', 'cos(x)', 'tan(3x+.2)', 'sec(x)', 'csc(x)', 'cot(x)', 'log(x)', 'asin(x)', 'acos(x)', 'atan(x)', 'sinh(x)', 'cosh(x)', 'sech(x)', 'tanh(x)', 'csch(x)', 'coth(x)', 'exp(x)', 'x*exp(x)', '1/(x-.0137)', '1e8*(x-.017931)^2-5', 'x^x', '1/(x^x)', '2^sin(x)']
   let enclosures = 0, values = 0
   for (const expression of expressions) {
     const fn = compileGraphFunction({ id: expression, expression })

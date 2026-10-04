@@ -203,7 +203,8 @@ export function sampleGraphSegments(
     // Equal probe values may alias a periodic curve. Resolve its argument
     // interval as well, rather than treating a whole number of cycles as flat.
     const phaseResolved = !range?.phaseSpan || range.phaseSpan(x0, x1) <= Math.PI / 2
-    if (linear && phaseResolved && (!allOffscreen || !enclosure || observedRangeResolved)) { emit([x0, y0], [x1, y1]); return }
+    if (linear && phaseResolved && (!allOffscreen || !enclosure || observedRangeResolved) &&
+        !range?.mayCrossSingularity?.(x0, x1)) { emit([x0, y0], [x1, y1]); return }
     // Subpixel horizontal width alone cannot erase a tall finite branch.
     // A real continuous, monotone probe interval narrower than half a pixel
     // is geometrically resolved even when its slope is almost vertical.

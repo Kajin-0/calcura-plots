@@ -20,6 +20,7 @@ export const fidelityExpressions = [
   // Visually tall but horizontally subpixel branches and a narrow visible valley.
   '1e9*(x-0.017931)^3', 'sqrt(1e8*(x-0.017931))',
   '1e8*(x-0.017931)^2-5',
+  '1e-8/(x^3-0.0137)', '1e-8/(sin(x^2)-0.0137)', '1/(x^x)',
 ]
 
 function distance(px: number, py: number, a: GraphPoint, b: GraphPoint, sx: number, sy: number): number {
@@ -53,8 +54,7 @@ test('adaptive geometry covers dense visible reference points at desktop and mob
         if (!Number.isFinite(y) || Math.abs(y) > ySpan) continue
         // Isolated integer-only evaluations of x^x on negative x are not a
         // continuous real-domain component and cannot form a polyline.
-        if (expression.startsWith('log(3*x^') && x < 0 &&
-            !Number.isFinite(compiled.evaluate(x + 1e-7)) && !Number.isFinite(compiled.evaluate(x - 1e-7))) continue
+        if (!Number.isFinite(compiled.evaluate(x + 1e-7)) && !Number.isFinite(compiled.evaluate(x - 1e-7))) continue
         // The infinitely oscillatory origin has no resolvable individual lobes below 1px.
         if (expression === 'sin(1/x)' && Math.abs(x) * sx < 1) continue
         references++

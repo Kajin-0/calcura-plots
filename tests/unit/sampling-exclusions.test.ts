@@ -35,3 +35,21 @@ test('zero powers do not manufacture holes; finite crossings and original exclus
   const endpoint = createGraphSampler({ id: 'endpoint', expression: 'x', domainEndpoints: [{ x: 1, y: 1, included: false }] })
   assert.ok(endpoint.sample({ x: [-2, 2], y: [-3, 3] }).every(points => !points.some(p => p[0] < 1) || !points.some(p => p[0] > 1)))
 })
+
+test('flat probes cannot bridge unpartitioned cubic or nonlinear trigonometric poles', () => {
+  for (const [expression, pole] of [
+    ['1e-8/(x^3-0.0137)', Math.cbrt(.0137)],
+    ['1e-8/(sin(x^2)-0.0137)', Math.sqrt(Math.asin(.0137))],
+  ] as const) {
+    const sampler = createGraphSampler({ id: 'unpartitioned', expression })
+    const segments = sampler.sample({ x: [-2, 2], y: [-10, 10] }, 330, 300)
+    assert.ok(segments.length >= 2, expression)
+    assert.ok(segments.every(p => !p.some(v => v[0] < pole) || !p.some(v => v[0] > pole)), expression)
+    const ys = segments.flat().map(p => p[1])
+    assert.ok(Math.max(...ys) > 9 && Math.min(...ys) < -9, 'both tall visible branches must survive')
+  }
+  // A positive variable-power denominator is continuous, not an invented gap.
+  const positive = createGraphSampler({ id: 'positive', expression: '1/(x^x)' })
+  const segments = positive.sample({ x: [.1, 2], y: [0, 2] }, 330, 300)
+  assert.equal(segments.length, 1)
+})

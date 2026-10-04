@@ -4,6 +4,10 @@ This renderer is not a grading or symbolic-proof authority. It accepts the
 validated graph grammar and preserves caller-provided domain/endpoints/holes.
 Inferred sampling boundaries partition provable denominator zeros and periodic
 poles; they do not invent semantic hole markers.
+Flat probe agreement cannot authorize a chord when a divisor interval still
+contains zero or is unresolved. This also protects unpartitioned cubic and
+nonlinear trigonometric poles; structural root enumeration is not the sole
+continuity authority. Positive-base variable powers have conservative bounds.
 
 ## Geometry contract
 
